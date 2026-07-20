@@ -48,8 +48,8 @@ dev = [
 hackingupdate = "hackingupdate.cli:cli"
 
 [project.urls]
-Homepage = "https://github.com/anilkumarjamadar/hackingupdate"
-Repository = "https://github.com/anilkumarjamadar/hackingupdate"
+Homepage = "https://github.com/4nilsj/hackingupdate"
+Repository = "https://github.com/4nilsj/hackingupdate"
 
 [tool.setuptools.packages.find]
 include = ["hackingupdate*"]

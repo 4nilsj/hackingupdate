@@ -21,7 +21,7 @@ An AI-powered pipeline that aggregates security feeds, deduplicates findings, ra
 
 ```bash
 # Clone and install
-git clone https://github.com/your-org/hackingupdate.git
+git clone https://github.com/4nilsj/hackingupdate.git
 cd hackingupdate
 pip install -e .
 
