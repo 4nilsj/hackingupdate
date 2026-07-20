@@ -66,8 +66,11 @@ python scripts/db_manager.py >> "$LOG_FILE" 2>&1
 log_step "Step 8/9: Generating Markdown daily brief (report_generator.py)..."
 python scripts/report_generator.py >> "$LOG_FILE" 2>&1
 
-log_step "Step 8/8: Rendering HTML brief (html_generator.py)..."
+log_step "Step 9/10: Rendering HTML brief (html_generator.py)..."
 python scripts/html_generator.py >> "$LOG_FILE" 2>&1
+
+log_step "Step 10/10: Generating RSS 2.0 XML feed (rss_generator.py)..."
+python scripts/rss_generator.py >> "$LOG_FILE" 2>&1
 
 log_step "Sending Microsoft Teams notifications (teams_notifier.py)..."
 python scripts/teams_notifier.py >> "$LOG_FILE" 2>&1

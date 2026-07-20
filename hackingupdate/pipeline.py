@@ -26,6 +26,7 @@ PIPELINE_STEPS = [
     ("db_store",    "db_manager",           "Storing findings to SQLite database"),
     ("report",      "report_generator",     "Generating Markdown daily brief"),
     ("html",        "html_generator",       "Rendering HTML brief"),
+    ("rss",         "rss_generator",        "Generating RSS 2.0 feed xml"),
     ("teams",       "teams_notifier",       "Sending Teams notifications"),
     ("whatsapp",    "whatsapp_notifier",    "Sending WhatsApp notifications"),
     ("prune",       "prune_logs",           "Pruning old logs"),
