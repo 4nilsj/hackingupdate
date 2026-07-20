@@ -1,0 +1,33 @@
+services:
+  hackingupdate:
+    build: .
+    container_name: hackingupdate
+    env_file:
+      - .env
+    volumes:
+      # Persist generated reports on host
+      - ./reports:/app/reports
+      # Persist logs on host
+      - ./logs:/app/logs
+      # Allow custom feeds
+      - ./feeds:/app/feeds
+      # Persist SQLite database on host
+      - ./data:/app/data
+    # Run the full pipeline
+    command: ["hackingupdate", "run"]
+    restart: "no"
+
+  # Optional: scheduled daily execution using ofelia
+  # Uncomment to enable automatic daily runs
+  #
+  # scheduler:
+  #   image: mcuadros/ofelia:latest
+  #   container_name: hackingupdate-scheduler
+  #   depends_on:
+  #     - hackingupdate
+  #   command: daemon --docker
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   labels:
+  #     ofelia.job-run.hackingupdate.schedule: "0 2 * * *"  # 7:30 AM IST = 2:00 AM UTC
+  #     ofelia.job-run.hackingupdate.container: "hackingupdate"
