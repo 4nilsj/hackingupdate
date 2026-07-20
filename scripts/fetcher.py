@@ -10,32 +10,54 @@ import config
 
 logger = config.get_logger("fetcher")
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 def fetch_feed(url):
     logger.info(f"Fetching feed: {url}")
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
     }
+    
+    response = None
     try:
-        # Some security feeds block default python user-agents, so we use requests with headers
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
-        # Parse XML content string
-        feed = feedparser.parse(response.content)
-        
-        if feed.bozo:
-            logger.warning(f"Feed parser reported potential issues (bozo bit set) for {url}: {feed.bozo_exception}")
-            
-        return feed
-    except Exception as e:
-        logger.error(f"Error fetching feed {url}: {e}")
-        # Try direct feedparser as a fallback
+    except requests.exceptions.SSLError as ssl_err:
+        logger.warning(f"SSL certificate verification failed for {url}, retrying without SSL verification...")
         try:
-            logger.info(f"Retrying {url} directly with feedparser...")
-            feed = feedparser.parse(url)
-            return feed
-        except Exception as e_inner:
-            logger.error(f"Fallback fetch also failed for {url}: {e_inner}")
-            return None
+            response = requests.get(url, headers=headers, timeout=15, verify=False)
+            response.raise_for_status()
+        except Exception as e_unverified:
+            logger.error(f"Unverified SSL fetch failed for {url}: {e_unverified}")
+    except Exception as e:
+        logger.warning(f"Initial HTTP fetch failed for {url}: {e}")
+        # Try with verify=False if it was a connection or cert error
+        try:
+            response = requests.get(url, headers=headers, timeout=15, verify=False)
+            if response.status_code == 200:
+                logger.info(f"Unverified SSL fetch succeeded for {url}")
+        except Exception:
+            pass
+
+    if response and response.status_code == 200:
+        try:
+            feed = feedparser.parse(response.content)
+            if feed and feed.entries:
+                return feed
+        except Exception as parse_err:
+            logger.warning(f"Failed to parse XML content for {url}: {parse_err}")
+
+    # Fallback to direct feedparser parsing
+    try:
+        logger.info(f"Retrying {url} directly with feedparser...")
+        feed = feedparser.parse(url)
+        return feed
+    except Exception as e_inner:
+        logger.error(f"Fallback fetch also failed for {url}: {e_inner}")
+        return None
 
 def main():
     if not config.FEEDS_FILE.exists():
