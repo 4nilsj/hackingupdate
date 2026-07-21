@@ -86,10 +86,10 @@ def main():
         logger.info(f"Only {len(working_set)} articles passed rank threshold. Falling back to top 8 articles.")
         working_set = unique_ranked_articles[:8]
         
-    # Cap the working set to top 15 articles to ensure reports remain concise and high impact
-    if len(working_set) > 15:
-        logger.info(f"Truncating working set from {len(working_set)} to top 15 highest-ranked articles.")
-        working_set = working_set[:15]
+    # Cap the working set to top 25 articles to ensure reports remain concise yet comprehensive
+    if len(working_set) > 25:
+        logger.info(f"Truncating working set from {len(working_set)} to top 25 highest-ranked articles.")
+        working_set = working_set[:25]
 
     logger.info(f"Selected {len(working_set)} articles for the working set.")
 
