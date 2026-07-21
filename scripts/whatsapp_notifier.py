@@ -45,10 +45,11 @@ def load_working_set_with_fallback(today_str):
 
     # Fallback to SQLite DB
     try:
-        from scripts.db_manager import get_today_findings
-        findings = get_today_findings(today_str)
+        from scripts.db_manager import get_findings_by_date
+        findings = get_findings_by_date()
         if findings:
-            return findings
+            # Convert DB row objects to dicts
+            return [dict(row) if hasattr(row, 'keys') else row for row in findings]
     except Exception as e:
         logger.warning(f"Could not load findings from SQLite DB: {e}")
 
