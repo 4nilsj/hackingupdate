@@ -500,13 +500,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             gap: 0.4rem;
         }}
 
-        .section-header.purple-hdr {{
-            color: var(--accent-purple);
-            border-bottom: 1px solid rgba(192, 132, 252, 0.25);
-            padding-bottom: 0.3rem;
-            margin-top: 1.2rem;
-        }}
-
         .article-content p {{
             font-size: 0.96rem;
             color: #cbd5e1;
@@ -526,14 +519,84 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             line-height: 1.6;
         }}
 
-        /* Threat Modeling Callout Box */
-        .threat-box {{
+        /* Sleek Threat Modeling Box */
+        .threat-card-box {{
             background: rgba(192, 132, 252, 0.06);
-            border: 1px solid rgba(192, 132, 252, 0.2);
+            border: 1px solid rgba(192, 132, 252, 0.25);
             border-left: 4px solid var(--accent-purple);
-            border-radius: 12px;
-            padding: 1.1rem;
-            margin-top: 0.5rem;
+            border-radius: 14px;
+            padding: 1.3rem;
+            margin-top: 1.2rem;
+            margin-bottom: 0.4rem;
+        }}
+
+        .threat-card-title {{
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #e9d5ff;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }}
+
+        .threat-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 0.85rem;
+        }}
+
+        .threat-item {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            background: rgba(9, 13, 22, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 0.85rem 1rem;
+            border-radius: 10px;
+        }}
+
+        .threat-item.full-width {{
+            grid-column: 1 / -1;
+            background: rgba(192, 132, 252, 0.08);
+            border-color: rgba(192, 132, 252, 0.25);
+        }}
+
+        .threat-key {{
+            font-size: 0.74rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            color: #c084fc;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }}
+
+        .threat-val {{
+            font-size: 0.93rem;
+            color: #f1f5f9;
+            line-height: 1.5;
+        }}
+
+        .stride-badge {{
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }}
+
+        .review-quote {{
+            font-style: italic;
+            color: #e9d5ff;
+            font-size: 0.95rem;
+            line-height: 1.5;
         }}
 
         /* References / Footer */
@@ -823,6 +886,58 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
+def format_threat_modeling_box(raw_threat):
+    """Transform raw threat modeling text into a clean key-value grid box."""
+    # Look for bullet points or line matches
+    stride_match = re.search(r'STRIDE Threat:\s*(.*?)(?=\n\*|\n-|\n[A-Z]|$)', raw_threat, re.DOTALL | re.IGNORECASE)
+    flaw_match = re.search(r'Design Flaw:\s*(.*?)(?=\n\*|\n-|\n[A-Z]|$)', raw_threat, re.DOTALL | re.IGNORECASE)
+    principle_match = re.search(r'Secure Design Principle:\s*(.*?)(?=\n|\*|-|[A-Z]|$)', raw_threat, re.DOTALL | re.IGNORECASE)
+    question_match = re.search(r'Secure Design Review Question:\s*(.*?)(?=\n|\*|-|[A-Z]|$)', raw_threat, re.DOTALL | re.IGNORECASE)
+
+    stride_val = stride_match.group(1).strip().strip('*_ ') if stride_match else ""
+    flaw_val = flaw_match.group(1).strip().strip('*_ ') if flaw_match else ""
+    principle_val = principle_match.group(1).strip().strip('*_ ') if principle_match else ""
+    question_val = question_match.group(1).strip().strip('*_ "\'') if question_match else ""
+
+    grid_items = []
+    if stride_val:
+        grid_items.append(f"""
+            <div class="threat-item">
+                <span class="threat-key">STRIDE Threat</span>
+                <span class="threat-val"><span class="stride-badge">{stride_val}</span></span>
+            </div>""")
+    if flaw_val:
+        grid_items.append(f"""
+            <div class="threat-item">
+                <span class="threat-key">Design Flaw</span>
+                <span class="threat-val">{flaw_val}</span>
+            </div>""")
+    if principle_val:
+        grid_items.append(f"""
+            <div class="threat-item">
+                <span class="threat-key">Secure Design Principle</span>
+                <span class="threat-val">{principle_val}</span>
+            </div>""")
+    if question_val:
+        grid_items.append(f"""
+            <div class="threat-item full-width">
+                <span class="threat-key">Design Review Question</span>
+                <span class="review-quote">&ldquo;{question_val}&rdquo;</span>
+            </div>""")
+
+    if not grid_items:
+        return ""
+
+    box_html = f"""
+    <div class="threat-card-box">
+        <div class="threat-card-title">🛡️ Threat Modeling & Secure Design Lesson</div>
+        <div class="threat-grid">
+            {"".join(grid_items)}
+        </div>
+    </div>
+    """
+    return box_html
+
 def parse_markdown_to_premium_html(md_path, today_str):
     with open(md_path, "r", encoding="utf-8") as f:
         md_content = f.read()
@@ -843,7 +958,7 @@ def parse_markdown_to_premium_html(md_path, today_str):
         """
         md_content = md_content.replace(exec_summary_match.group(0), "")
 
-    # Clean title
+    # Clean main title
     md_content = re.sub(r'^#\s+Daily Security Intelligence Briefing.*?\n', '', md_content, flags=re.IGNORECASE)
 
     # Clean references
@@ -873,8 +988,8 @@ def parse_markdown_to_premium_html(md_path, today_str):
         """
         md_content = md_content.replace(ref_match.group(0), "")
 
-    # Split into categories and clean Category names
-    sections = re.split(r'##\s+(?:Category:\s*)?', md_content, flags=re.IGNORECASE)
+    # Split exclusively by Category sections (## Category: WEB)
+    sections = re.split(r'\n##\s+Category:\s*', '\n' + md_content, flags=re.IGNORECASE)
     
     body_html_parts = []
     
@@ -890,14 +1005,15 @@ def parse_markdown_to_premium_html(md_path, today_str):
             continue
         
         lines = section.strip().split('\n')
-        # Clean category header line: strip ##, Category:, and leading symbols
         raw_cat = lines[0].strip()
         category_name = re.sub(r'^(#+|\s*category:|\s*)+', '', raw_cat, flags=re.IGNORECASE).strip().upper()
-        if not category_name or category_name.startswith("###"):
+        
+        # If no valid category name, skip
+        if not category_name or len(category_name) > 30:
             continue
 
         category_content = "\n".join(lines[1:])
-        articles = re.split(r'###\s+', category_content)
+        articles = re.split(r'\n###\s+', '\n' + category_content)
         category_html_cards = []
         
         for art in articles:
@@ -950,13 +1066,20 @@ def parse_markdown_to_premium_html(md_path, today_str):
                 pattern = r'\*\*' + re.escape(h) + r'\*\*:\s*\n\s*(\S)'
                 cleaned_art_body = re.sub(pattern, r'**' + h + r'**:\n\n\1', cleaned_art_body, flags=re.IGNORECASE)
 
+            # Intercept and format Threat Modeling section cleanly
+            threat_block_match = re.search(r'\*\*Threat Modeling & Secure Design Lesson\*\*:\s*\n(.*?)(?=\*\*Remediation\*\*|$)', cleaned_art_body, re.DOTALL | re.IGNORECASE)
+            threat_box_html = ""
+            if threat_block_match:
+                raw_threat = threat_block_match.group(1).strip()
+                threat_box_html = format_threat_modeling_box(raw_threat)
+                cleaned_art_body = cleaned_art_body.replace(threat_block_match.group(0), "")
+
             rendered_body = markdown.markdown(cleaned_art_body)
             
             headers_to_style = {
                 "Description &amp; Context": ("📌 Description & Context", ""),
                 "TTPs &amp; Exploitation Vectors": ("⚡ TTPs & Exploitation Vectors", ""),
                 "Pentesting Value &amp; Testing Method": ("🎯 Pentesting Value & Testing Method", ""),
-                "Threat Modeling &amp; Secure Design Lesson": ("🛡️ Threat Modeling & Secure Design Lesson", "purple-hdr"),
                 "Remediation": ("🔧 Remediation & Mitigations", "")
             }
             
@@ -975,6 +1098,10 @@ def parse_markdown_to_premium_html(md_path, today_str):
                     flags=re.IGNORECASE
                 )
             
+            # Re-insert cleanly structured Threat Modeling Grid Box
+            if threat_box_html:
+                rendered_body += threat_box_html
+
             tags_html = "".join([f'<span class="tag-pill tag-{t}">{t}</span>' for t in tags])
             
             if rank_num >= 8:
