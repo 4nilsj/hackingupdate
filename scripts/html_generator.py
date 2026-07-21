@@ -887,17 +887,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 def format_threat_modeling_box(raw_threat):
-    """Transform raw threat modeling text into a clean key-value grid box."""
-    # Look for bullet points or line matches
-    stride_match = re.search(r'STRIDE Threat:\s*(.*?)(?=\n\*|\n-|\n[A-Z]|$)', raw_threat, re.DOTALL | re.IGNORECASE)
-    flaw_match = re.search(r'Design Flaw:\s*(.*?)(?=\n\*|\n-|\n[A-Z]|$)', raw_threat, re.DOTALL | re.IGNORECASE)
-    principle_match = re.search(r'Secure Design Principle:\s*(.*?)(?=\n|\*|-|[A-Z]|$)', raw_threat, re.DOTALL | re.IGNORECASE)
-    question_match = re.search(r'Secure Design Review Question:\s*(.*?)(?=\n|\*|-|[A-Z]|$)', raw_threat, re.DOTALL | re.IGNORECASE)
+    """Transform raw threat modeling text into a clean key-value grid box regardless of how AI formatted it."""
+    clean_text = re.sub(r'</?(em|strong|p|li|ul|div|span)[^>]*>', '', raw_threat)
+    
+    stride_match = re.search(r'(?:STRIDE Threat|STRIDE):\s*(.*?)(?=(?:Design Flaw|Secure Design Principle|Secure Design Review Question|\*|_|\n|$))', clean_text, re.IGNORECASE | re.DOTALL)
+    flaw_match = re.search(r'(?:Design Flaw):\s*(.*?)(?=(?:Secure Design Principle|Secure Design Review Question|\*|_|\n|$))', clean_text, re.IGNORECASE | re.DOTALL)
+    principle_match = re.search(r'(?:Secure Design Principle):\s*(.*?)(?=(?:Secure Design Review Question|\*|_|\n|$))', clean_text, re.IGNORECASE | re.DOTALL)
+    question_match = re.search(r'(?:Secure Design Review Question):\s*(.*?)(?=(?:\*|_|\n|$))', clean_text, re.IGNORECASE | re.DOTALL)
 
-    stride_val = stride_match.group(1).strip().strip('*_ ') if stride_match else ""
-    flaw_val = flaw_match.group(1).strip().strip('*_ ') if flaw_match else ""
-    principle_val = principle_match.group(1).strip().strip('*_ ') if principle_match else ""
-    question_val = question_match.group(1).strip().strip('*_ "\'') if question_match else ""
+    def clean_val(match):
+        if not match:
+            return ""
+        val = match.group(1).strip()
+        val = re.sub(r'^[*_`"\s]+|[*_`"\s]+$', '', val)
+        val = re.sub(r'\s+', ' ', val)
+        return val
+
+    stride_val = clean_val(stride_match)
+    flaw_val = clean_val(flaw_match)
+    principle_val = clean_val(principle_match)
+    question_val = clean_val(question_match)
 
     grid_items = []
     if stride_val:
@@ -1008,7 +1017,6 @@ def parse_markdown_to_premium_html(md_path, today_str):
         raw_cat = lines[0].strip()
         category_name = re.sub(r'^(#+|\s*category:|\s*)+', '', raw_cat, flags=re.IGNORECASE).strip().upper()
         
-        # If no valid category name, skip
         if not category_name or len(category_name) > 30:
             continue
 
@@ -1063,11 +1071,11 @@ def parse_markdown_to_premium_html(md_path, today_str):
                 "Remediation"
             ]
             for h in headers_list:
-                pattern = r'\*\*' + re.escape(h) + r'\*\*:\s*\n\s*(\S)'
+                pattern = r'\*\*' + re.escape(h) + r'\*\*:\s*(\S)'
                 cleaned_art_body = re.sub(pattern, r'**' + h + r'**:\n\n\1', cleaned_art_body, flags=re.IGNORECASE)
 
-            # Intercept and format Threat Modeling section cleanly
-            threat_block_match = re.search(r'\*\*Threat Modeling & Secure Design Lesson\*\*:\s*\n(.*?)(?=\*\*Remediation\*\*|$)', cleaned_art_body, re.DOTALL | re.IGNORECASE)
+            # Extract Threat Modeling block cleanly (whether on same line or next line)
+            threat_block_match = re.search(r'\*\*Threat Modeling & Secure Design Lesson\*\*:\s*(.*?)(?=\*\*Remediation\*\*|$)', cleaned_art_body, re.DOTALL | re.IGNORECASE)
             threat_box_html = ""
             if threat_block_match:
                 raw_threat = threat_block_match.group(1).strip()
@@ -1097,7 +1105,15 @@ def parse_markdown_to_premium_html(md_path, today_str):
                     rendered_body,
                     flags=re.IGNORECASE
                 )
-            
+
+            # FALLBACK POST-MARKDOWN CHECK: If Threat Modeling wasn't caught pre-markdown, catch it post-markdown!
+            if not threat_box_html:
+                post_threat_match = re.search(r'(?:<p><strong>|<div[^>]*>)Threat Modeling &amp; Secure Design Lesson.*?(?:</strong></p>|</div>)(.*?)(?=<div class="section-header">|<h2>|<h3|</div>\s*</div>|$)', rendered_body, re.DOTALL | re.IGNORECASE)
+                if post_threat_match:
+                    raw_post_threat = post_threat_match.group(1).strip()
+                    threat_box_html = format_threat_modeling_box(raw_post_threat)
+                    rendered_body = rendered_body.replace(post_threat_match.group(0), "")
+
             # Re-insert cleanly structured Threat Modeling Grid Box
             if threat_box_html:
                 rendered_body += threat_box_html
