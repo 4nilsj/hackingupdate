@@ -10,7 +10,7 @@ import config
 
 logger = config.get_logger("html_generator")
 
-# Modern HTML Dark Mode Template with glassmorphism, stats banner, and interactive tag/severity/search filtering
+# Ultra-clean, modern Cyberpunk / Security Dark Theme HTML Template
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,18 +21,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     
     <style>
         :root {{
-            --bg-color: #090d16;
-            --card-bg: rgba(18, 26, 46, 0.65);
-            --card-hover-bg: rgba(26, 37, 66, 0.75);
-            --card-border: rgba(255, 255, 255, 0.08);
+            --bg-color: #0b0f19;
+            --card-bg: rgba(19, 27, 46, 0.7);
+            --card-hover-bg: rgba(25, 36, 62, 0.85);
+            --card-border: rgba(255, 255, 255, 0.07);
             --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
-            --accent-glow: #00f2fe;
             --accent-primary: #38bdf8;
             --accent-purple: #c084fc;
             --accent-danger: #ef4444;
@@ -55,21 +54,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         @keyframes fadeIn {{
-            from {{ opacity: 0; transform: translateY(12px); }}
+            from {{ opacity: 0; transform: translateY(10px); }}
             to {{ opacity: 1; transform: translateY(0); }}
         }}
 
         @keyframes pulseGlow {{
             0%, 100% {{ opacity: 1; transform: scale(1); }}
-            50% {{ opacity: 0.5; transform: scale(1.2); }}
+            50% {{ opacity: 0.4; transform: scale(1.25); }}
         }}
 
         body {{
             background-color: var(--bg-color);
             background-image: 
-                radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.08) 0px, transparent 45%),
-                radial-gradient(circle at 85% 85%, rgba(192, 132, 252, 0.08) 0px, transparent 45%),
-                radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.5) 0px, transparent 100%);
+                radial-gradient(circle at 12% 12%, rgba(56, 189, 248, 0.07) 0px, transparent 40%),
+                radial-gradient(circle at 88% 88%, rgba(192, 132, 252, 0.07) 0px, transparent 40%);
             color: var(--text-primary);
             font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
             line-height: 1.6;
@@ -78,7 +76,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .container {{
-            max-width: 1060px;
+            max-width: 1040px;
             margin: 0 auto;
             animation: fadeIn 0.4s ease-out;
         }}
@@ -87,7 +85,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         header {{
             text-align: center;
             margin-bottom: 2.5rem;
-            position: relative;
         }}
 
         header .header-badge {{
@@ -95,11 +92,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             align-items: center;
             gap: 0.5rem;
             padding: 0.4rem 1.1rem;
-            background: rgba(56, 189, 248, 0.1);
-            border: 1px solid rgba(56, 189, 248, 0.3);
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.25);
             color: var(--accent-primary);
             border-radius: 50px;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 700;
             margin-bottom: 1rem;
             text-transform: uppercase;
@@ -116,21 +113,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         header h1 {{
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 3rem;
+            font-size: 2.8rem;
             font-weight: 800;
-            background: linear-gradient(135deg, #00f2fe 0%, #38bdf8 40%, #c084fc 100%);
+            background: linear-gradient(135deg, #00f2fe 0%, #38bdf8 45%, #c084fc 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 0.4rem;
-            letter-spacing: -0.04em;
+            letter-spacing: -0.03em;
             line-height: 1.15;
         }}
 
         header p.date {{
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             color: var(--text-secondary);
             font-weight: 500;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.03em;
         }}
 
         /* Metrics Banner */
@@ -142,12 +139,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .metric-card {{
-            background: rgba(18, 26, 46, 0.5);
+            background: var(--card-bg);
             border: 1px solid var(--card-border);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border-radius: 16px;
-            padding: 1.2rem 1.4rem;
+            padding: 1.1rem 1.3rem;
             display: flex;
             align-items: center;
             gap: 1rem;
@@ -177,7 +174,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .metric-info .val {{
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 1.6rem;
+            font-size: 1.55rem;
             font-weight: 800;
             color: var(--text-primary);
             line-height: 1;
@@ -185,26 +182,26 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .metric-info .lbl {{
-            font-size: 0.82rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
-            font-weight: 500;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }}
 
         /* Interactive Filter Bar */
         .filter-bar {{
-            background: rgba(18, 26, 46, 0.5);
+            background: var(--card-bg);
             border: 1px solid var(--card-border);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
-            padding: 1.4rem;
+            padding: 1.3rem 1.4rem;
             border-radius: 18px;
             margin-bottom: 2.5rem;
             display: flex;
             flex-direction: column;
             gap: 1rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
         }}
 
         .search-wrapper {{
@@ -214,12 +211,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .search-box {{
             width: 100%;
-            padding: 0.85rem 1.2rem 0.85rem 2.8rem;
-            background: rgba(9, 13, 22, 0.85);
+            padding: 0.8rem 1.2rem 0.8rem 2.8rem;
+            background: rgba(9, 13, 22, 0.9);
             border: 1px solid var(--card-border);
             border-radius: 12px;
             color: var(--text-primary);
-            font-size: 0.98rem;
+            font-size: 0.95rem;
             font-family: inherit;
             outline: none;
             transition: border-color 0.3s, box-shadow 0.3s;
@@ -256,12 +253,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .filter-group {{
             display: flex;
             flex-wrap: wrap;
-            gap: 0.6rem;
+            gap: 0.5rem;
             align-items: center;
         }}
 
         .filter-label {{
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             color: var(--text-secondary);
             font-weight: 700;
             text-transform: uppercase;
@@ -270,13 +267,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .btn-filter {{
-            padding: 0.42rem 0.95rem;
+            padding: 0.38rem 0.85rem;
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--card-border);
             color: var(--text-secondary);
             border-radius: 8px;
             cursor: pointer;
-            font-size: 0.85rem;
+            font-size: 0.83rem;
             font-weight: 600;
             transition: all 0.2s ease;
             display: inline-flex;
@@ -295,24 +292,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             color: #090d16;
             border-color: var(--accent-primary);
             font-weight: 700;
-            box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
         }}
 
         .filter-status {{
-            font-size: 0.85rem;
+            font-size: 0.83rem;
             color: var(--text-secondary);
             font-family: 'JetBrains Mono', monospace;
-            margin-top: 0.2rem;
+            margin-top: 0.1rem;
         }}
 
         /* Executive Summary Section */
         .executive-summary {{
-            background: linear-gradient(135deg, rgba(18, 26, 46, 0.9) 0%, rgba(192, 132, 252, 0.12) 100%);
+            background: linear-gradient(135deg, rgba(19, 27, 46, 0.95) 0%, rgba(192, 132, 252, 0.1) 100%);
             border: 1px solid rgba(192, 132, 252, 0.3);
-            border-radius: 20px;
-            padding: 2rem;
+            border-radius: 18px;
+            padding: 1.8rem 2rem;
             margin-bottom: 3rem;
-            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             position: relative;
             overflow: hidden;
         }}
@@ -329,9 +326,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .executive-summary h2 {{
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 1.5rem;
+            font-size: 1.45rem;
             color: #e9d5ff;
-            margin-bottom: 1rem;
+            margin-bottom: 0.9rem;
             display: flex;
             align-items: center;
             gap: 0.6rem;
@@ -339,25 +336,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .executive-summary p {{
-            font-size: 1.05rem;
+            font-size: 1.02rem;
             color: #cbd5e1;
             line-height: 1.7;
         }}
 
         /* Category Section */
         .category-section {{
-            margin-bottom: 3.5rem;
+            margin-bottom: 3rem;
         }}
 
         .category-title {{
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 1.7rem;
+            font-size: 1.55rem;
             color: var(--accent-primary);
-            margin-bottom: 1.6rem;
-            border-bottom: 2px solid rgba(56, 189, 248, 0.2);
-            padding-bottom: 0.6rem;
+            margin-bottom: 1.4rem;
+            border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+            padding-bottom: 0.5rem;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.05em;
             display: flex;
             align-items: center;
             gap: 0.6rem;
@@ -369,9 +366,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             border: 1px solid var(--card-border);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
-            border-radius: 18px;
+            border-radius: 16px;
             padding: 1.6rem;
-            margin-bottom: 1.6rem;
+            margin-bottom: 1.5rem;
             transition: all 0.25s ease;
             position: relative;
         }}
@@ -379,13 +376,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .article-card:hover {{
             background: var(--card-hover-bg);
             border-color: rgba(56, 189, 248, 0.35);
-            transform: translateY(-3px);
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35), 0 0 16px rgba(56, 189, 248, 0.1);
         }}
 
         .article-card.critical-card {{
             border-left: 4px solid var(--accent-danger);
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.06) 0%, rgba(18, 26, 46, 0.7) 100%);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(19, 27, 46, 0.75) 100%);
         }}
 
         .article-header {{
@@ -393,13 +390,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             justify-content: space-between;
             align-items: flex-start;
             gap: 1.2rem;
-            margin-bottom: 0.9rem;
+            margin-bottom: 0.8rem;
         }}
 
         .article-title-link {{
             color: var(--text-primary);
             text-decoration: none;
-            font-size: 1.3rem;
+            font-size: 1.25rem;
             font-weight: 700;
             line-height: 1.35;
             transition: color 0.2s;
@@ -412,9 +409,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .rank-badge {{
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
-            padding: 0.3rem 0.75rem;
-            font-size: 0.82rem;
+            gap: 0.35rem;
+            padding: 0.28rem 0.7rem;
+            font-size: 0.8rem;
             font-weight: 800;
             font-family: 'JetBrains Mono', monospace;
             border-radius: 8px;
@@ -423,33 +420,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .rank-critical {{
-            background: rgba(239, 68, 68, 0.18);
-            border: 1px solid rgba(239, 68, 68, 0.5);
+            background: rgba(239, 68, 68, 0.16);
+            border: 1px solid rgba(239, 68, 68, 0.45);
             color: #fca5a5;
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.2);
         }}
 
         .rank-high {{
-            background: rgba(245, 158, 11, 0.18);
-            border: 1px solid rgba(245, 158, 11, 0.5);
+            background: rgba(245, 158, 11, 0.16);
+            border: 1px solid rgba(245, 158, 11, 0.45);
             color: #fde047;
         }}
 
         .rank-medium {{
-            background: rgba(56, 189, 248, 0.15);
-            border: 1px solid rgba(56, 189, 248, 0.4);
+            background: rgba(56, 189, 248, 0.14);
+            border: 1px solid rgba(56, 189, 248, 0.35);
             color: #7dd3fc;
         }}
 
         .article-meta {{
             display: flex;
             flex-wrap: wrap;
-            gap: 0.8rem;
+            gap: 0.75rem;
             align-items: center;
-            font-size: 0.88rem;
+            font-size: 0.85rem;
             color: var(--text-secondary);
             margin-bottom: 1.2rem;
-            padding-bottom: 0.8rem;
+            padding-bottom: 0.75rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }}
 
@@ -458,7 +454,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             color: #cbd5e1;
             display: inline-flex;
             align-items: center;
-            gap: 0.35rem;
+            gap: 0.3rem;
         }}
 
         .meta-separator {{
@@ -467,13 +463,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         /* Tag Pill Styling */
         .tag-pill {{
-            padding: 0.2rem 0.6rem;
-            font-size: 0.73rem;
+            padding: 0.18rem 0.55rem;
+            font-size: 0.72rem;
             font-weight: 800;
             font-family: 'JetBrains Mono', monospace;
-            border-radius: 6px;
+            border-radius: 5px;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.05em;
         }}
 
         .tag-web {{ background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }}
@@ -488,16 +484,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .article-content {{
             display: flex;
             flex-direction: column;
-            gap: 0.8rem;
+            gap: 0.85rem;
         }}
 
         .section-header {{
-            font-size: 0.92rem;
+            font-size: 0.88rem;
             font-weight: 800;
             color: var(--accent-primary);
             text-transform: uppercase;
-            margin-top: 1rem;
-            margin-bottom: 0.3rem;
+            margin-top: 0.9rem;
+            margin-bottom: 0.25rem;
             letter-spacing: 0.06em;
             display: flex;
             align-items: center;
@@ -508,22 +504,36 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             color: var(--accent-purple);
             border-bottom: 1px solid rgba(192, 132, 252, 0.25);
             padding-bottom: 0.3rem;
+            margin-top: 1.2rem;
         }}
 
         .article-content p {{
-            font-size: 0.98rem;
+            font-size: 0.96rem;
             color: #cbd5e1;
             line-height: 1.65;
         }}
 
         .article-content ul {{
-            margin-left: 1.2rem;
+            margin-left: 1.1rem;
             color: #cbd5e1;
-            font-size: 0.96rem;
+            font-size: 0.95rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
         }}
 
         .article-content li {{
-            margin-bottom: 0.35rem;
+            line-height: 1.6;
+        }}
+
+        /* Threat Modeling Callout Box */
+        .threat-box {{
+            background: rgba(192, 132, 252, 0.06);
+            border: 1px solid rgba(192, 132, 252, 0.2);
+            border-left: 4px solid var(--accent-purple);
+            border-radius: 12px;
+            padding: 1.1rem;
+            margin-top: 0.5rem;
         }}
 
         /* References / Footer */
@@ -537,9 +547,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .references h2 {{
             font-family: 'Space Grotesk', sans-serif;
-            font-size: 1.4rem;
+            font-size: 1.35rem;
             color: var(--accent-primary);
-            margin-bottom: 1.2rem;
+            margin-bottom: 1.1rem;
         }}
 
         .references ul {{
@@ -550,7 +560,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .references li {{
-            font-size: 0.95rem;
+            font-size: 0.94rem;
         }}
 
         .references a {{
@@ -578,7 +588,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             text-decoration: none;
         }}
 
-        /* Back to top floating button */
+        /* Floating back-to-top button */
         .back-to-top {{
             position: fixed;
             bottom: 2rem;
@@ -617,7 +627,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 padding: 1.2rem 0.6rem;
             }}
             header h1 {{
-                font-size: 2.2rem;
+                font-size: 2.1rem;
             }}
             .metrics-banner {{
                 grid-template-columns: 1fr 1fr;
@@ -722,7 +732,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let currentTag = 'all';
         let currentSeverity = 'all';
 
-        // Focus search with '/' key
         document.addEventListener('keydown', (e) => {{
             if (e.key === '/' && document.activeElement !== searchInput) {{
                 e.preventDefault();
@@ -730,7 +739,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             }}
         }});
 
-        // Show/hide back to top button
         window.addEventListener('scroll', () => {{
             if (window.scrollY > 400) {{
                 backToTop.classList.add('visible');
@@ -798,7 +806,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 }}
             }});
 
-            // Hide category sections that have no visible cards
             const sections = document.querySelectorAll('.category-section');
             sections.forEach(section => {{
                 const visibleCardsInSec = section.querySelectorAll('.article-card[style="display: block;"], .article-card:not([style*="display: none"])');
@@ -820,7 +827,7 @@ def parse_markdown_to_premium_html(md_path, today_str):
     with open(md_path, "r", encoding="utf-8") as f:
         md_content = f.read()
 
-    # Extract Executive Summary
+    # Clean executive summary
     exec_summary_match = re.search(r'## Executive Summary\n(.*?)(?=\n##|$)', md_content, re.DOTALL)
     exec_summary_html = ""
     if exec_summary_match:
@@ -836,10 +843,10 @@ def parse_markdown_to_premium_html(md_path, today_str):
         """
         md_content = md_content.replace(exec_summary_match.group(0), "")
 
-    # Clean the first H1 title
+    # Clean title
     md_content = re.sub(r'^#\s+Daily Security Intelligence Briefing.*?\n', '', md_content, flags=re.IGNORECASE)
 
-    # Extract References section
+    # Clean references
     ref_match = re.search(r'## References\n(.*?)$', md_content, re.DOTALL)
     ref_html = ""
     if ref_match:
@@ -866,8 +873,8 @@ def parse_markdown_to_premium_html(md_path, today_str):
         """
         md_content = md_content.replace(ref_match.group(0), "")
 
-    # Split into categories
-    sections = re.split(r'##\s+Category:\s*', md_content, flags=re.IGNORECASE)
+    # Split into categories and clean Category names
+    sections = re.split(r'##\s+(?:Category:\s*)?', md_content, flags=re.IGNORECASE)
     
     body_html_parts = []
     
@@ -883,9 +890,13 @@ def parse_markdown_to_premium_html(md_path, today_str):
             continue
         
         lines = section.strip().split('\n')
-        category_name = lines[0].strip()
+        # Clean category header line: strip ##, Category:, and leading symbols
+        raw_cat = lines[0].strip()
+        category_name = re.sub(r'^(#+|\s*category:|\s*)+', '', raw_cat, flags=re.IGNORECASE).strip().upper()
+        if not category_name or category_name.startswith("###"):
+            continue
+
         category_content = "\n".join(lines[1:])
-        
         articles = re.split(r'###\s+', category_content)
         category_html_cards = []
         
@@ -942,11 +953,11 @@ def parse_markdown_to_premium_html(md_path, today_str):
             rendered_body = markdown.markdown(cleaned_art_body)
             
             headers_to_style = {
-                "Description &amp; Context": ("Description & Context", ""),
-                "TTPs &amp; Exploitation Vectors": ("TTPs & Exploitation Vectors", ""),
-                "Pentesting Value &amp; Testing Method": ("Pentesting Value & Testing Method", ""),
-                "Threat Modeling &amp; Secure Design Lesson": ("Threat Modeling & Secure Design Lesson", "purple-hdr"),
-                "Remediation": ("Remediation", "")
+                "Description &amp; Context": ("📌 Description & Context", ""),
+                "TTPs &amp; Exploitation Vectors": ("⚡ TTPs & Exploitation Vectors", ""),
+                "Pentesting Value &amp; Testing Method": ("🎯 Pentesting Value & Testing Method", ""),
+                "Threat Modeling &amp; Secure Design Lesson": ("🛡️ Threat Modeling & Secure Design Lesson", "purple-hdr"),
+                "Remediation": ("🔧 Remediation & Mitigations", "")
             }
             
             for key, (val, extra_cls) in headers_to_style.items():
@@ -966,7 +977,6 @@ def parse_markdown_to_premium_html(md_path, today_str):
             
             tags_html = "".join([f'<span class="tag-pill tag-{t}">{t}</span>' for t in tags])
             
-            # Rank styling & card classes
             if rank_num >= 8:
                 rank_class = "rank-critical"
                 card_extra_class = "critical-card"
@@ -1043,7 +1053,6 @@ def main():
         logger.critical(f"Failed to generate HTML report: {e}")
         sys.exit(1)
 
-    # Also make sure scripts/ html generator stays identical
     scripts_html_gen = config.BASE_DIR / "scripts" / "html_generator.py"
     if scripts_html_gen.exists() and str(Path(__file__).resolve()) != str(scripts_html_gen):
         try:
