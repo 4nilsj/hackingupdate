@@ -59,16 +59,24 @@ def run(step, no_cache_clear):
         raise SystemExit(1)
 
 
-# ─── notify ───────────────────────────────────────────────────────────────────
-
 @cli.command()
 @click.option("--whatsapp", is_flag=True, help="Send WhatsApp notification.")
 @click.option("--teams", is_flag=True, help="Send Teams notification.")
 @click.option("--all", "all_channels", is_flag=True, help="Send to all channels.")
-def notify(whatsapp, teams, all_channels):
+@click.option("--channel", "-c", type=click.Choice(["whatsapp", "teams", "all"], case_sensitive=False), help="Select notification channel.")
+def notify(whatsapp, teams, all_channels, channel):
     """Send notifications via configured channels."""
+    if channel:
+        channel = channel.lower()
+        if channel == "whatsapp":
+            whatsapp = True
+        elif channel == "teams":
+            teams = True
+        elif channel == "all":
+            all_channels = True
+
     if not whatsapp and not teams and not all_channels:
-        click.echo("Specify a channel: --whatsapp, --teams, or --all")
+        click.echo("Specify a channel: --whatsapp, --teams, --channel whatsapp, or --all")
         raise SystemExit(1)
 
     steps = []
