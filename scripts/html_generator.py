@@ -861,11 +861,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <button class="btn-filter" onclick="filterTag('cloud')">Cloud</button>
                 <button class="btn-filter" onclick="filterTag('infra')">Infra</button>
                 <button class="btn-filter" onclick="filterTag('news')">📰 News</button>
-                <button class="btn-filter" onclick="filterTag('npm')">NPM</button>
-                <button class="btn-filter" onclick="filterTag('pypi')">PyPI</button>
-                <button class="btn-filter" onclick="filterTag('go')">Go</button>
-                <button class="btn-filter" onclick="filterTag('maven')">Maven</button>
-                <button class="btn-filter" onclick="filterTag('cargo')">Cargo</button>
+                <button class="btn-filter" onclick="filterTag('dependencies')">📦 Dependencies</button>
             </div>
             <div class="filter-status" id="filterStatus">Showing {total_count} of {total_count} findings</div>
         </div>
@@ -952,7 +948,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 else if (rankBadge.classList.contains('rank-high')) cardSeverity = 'high';
 
                 const matchesSearch = title.includes(query) || content.includes(query);
-                const matchesTag = currentTag === 'all' || tags.includes(currentTag.toLowerCase());
+                const depTags = ['npm', 'pypi', 'go', 'maven', 'cargo'];
+                const matchesTag = currentTag === 'all' || 
+                                   (currentTag === 'dependencies' ? tags.some(t => depTags.includes(t)) : tags.includes(currentTag.toLowerCase()));
                 const matchesSeverity = currentSeverity === 'all' || cardSeverity === currentSeverity.toLowerCase();
 
                 if (matchesSearch && matchesTag && matchesSeverity) {{

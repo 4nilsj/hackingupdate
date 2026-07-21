@@ -7,3 +7,9 @@ https://apisecurity.io/feed/
 https://www.securityweek.com/feed/
 https://www.bleepingcomputer.com/feed/
 https://www.hkcert.org/rss/security-bulletin.xml
+https://thehackernews.com/rss.xml
+https://www.darkreading.com/rss.xml
+https://krebsonsecurity.com/feed/
+https://unit42.paloaltonetworks.com/feed/
+https://blog.talosintelligence.com/rss/
+
