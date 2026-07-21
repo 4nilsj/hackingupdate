@@ -162,7 +162,7 @@ Articles list:
 Structure of your output report:
 1. Title: "# Daily Security Intelligence Briefing - {today_str}"
 2. Executive Summary: A 1-paragraph summary highlighting the most critical threats/tactics observed today.
-3. Category Headings: Write headings for each of the matching tags: {config.PENTEST_TAGS} (only write categories that have articles).
+3. Category Headings: Write headings for each of the matching tags: {config.PENTEST_TAGS} (only write categories that have articles). Note: Include top high-impact general security news stories (e.g. breach disclosures, APT campaign alerts, ransomware attacks) under Category: NEWS alongside technical zero-day vulnerabilities.
 4. Article Summaries: Under each category heading:
    - "### [Title]"
    - Metadata bullet points: Source, Rank (X/10), Link, and Pentester Category tags.

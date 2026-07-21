@@ -479,6 +479,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .tag-thickclient {{ background: rgba(168, 85, 247, 0.15); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.3); }}
         .tag-cloud {{ background: rgba(6, 182, 212, 0.15); color: #67e8f9; border: 1px solid rgba(6, 182, 212, 0.3); }}
         .tag-infra {{ background: rgba(100, 116, 139, 0.15); color: #cbd5e1; border: 1px solid rgba(100, 116, 139, 0.3); }}
+        .tag-news {{ background: rgba(234, 179, 8, 0.15); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.3); }}
 
         /* Article Content Section Headers */
         .article-content {{
@@ -772,6 +773,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <button class="btn-filter" onclick="filterTag('thickclient')">Thick Client</button>
                 <button class="btn-filter" onclick="filterTag('cloud')">Cloud</button>
                 <button class="btn-filter" onclick="filterTag('infra')">Infra</button>
+                <button class="btn-filter" onclick="filterTag('news')">📰 News</button>
             </div>
             <div class="filter-status" id="filterStatus">Showing {total_count} of {total_count} findings</div>
         </div>

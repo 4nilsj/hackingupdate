@@ -56,6 +56,10 @@ FALLBACK_KEYWORDS = {
         "pth", "pass-the-ticket", "ptt", "mimikatz", "bloodhound", "gpo", "group policy", "dc", 
         "smb signing", "ntlm", "ntlmv2", "relay attack", "responder", "llmnr", "nbt-ns", "wsus", 
         "sccm", "hyper-v", "proxmox", "kvm", "docker-compose", "openssl", "heartbleed"
+    ],
+    "news": [
+        "breach", "cyberattack", "hack", "ransomware", "data leak", "policy", "regulation", "lawsuit",
+        "ai security", "threat actor", "apt", "group", "incident", "advisory", "security news", "stolen"
     ]
 }
 
