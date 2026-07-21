@@ -2,6 +2,11 @@ services:
   hackingupdate:
     build: .
     container_name: hackingupdate
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'      # Cap to max 50% of 1 CPU core
+          memory: 512M     # Cap to max 512 MB RAM
     env_file:
       - .env
     volumes:
