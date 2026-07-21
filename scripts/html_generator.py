@@ -887,8 +887,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 def format_threat_modeling_box(raw_threat):
-    """Transform raw threat modeling text into a clean key-value grid box regardless of how AI formatted it."""
-    clean_text = re.sub(r'</?(em|strong|p|li|ul|div|span)[^>]*>', '', raw_threat)
+    """Transform raw threat modeling text into a clean key-value grid box regardless of format."""
+    clean_text = re.sub(r'</?(em|strong|p|li|ul|div|span)[^>]*>', '', raw_threat).strip()
+    if not clean_text:
+        return ""
     
     stride_match = re.search(r'(?:STRIDE Threat|STRIDE):\s*(.*?)(?=(?:Design Flaw|Secure Design Principle|Secure Design Review Question|\*|_|\n|$))', clean_text, re.IGNORECASE | re.DOTALL)
     flaw_match = re.search(r'(?:Design Flaw):\s*(.*?)(?=(?:Secure Design Principle|Secure Design Review Question|\*|_|\n|$))', clean_text, re.IGNORECASE | re.DOTALL)
@@ -934,15 +936,17 @@ def format_threat_modeling_box(raw_threat):
                 <span class="review-quote">&ldquo;{question_val}&rdquo;</span>
             </div>""")
 
+    # NEVER DELETE CONTENT: Fallback to rendered markdown if grid matching fails
     if not grid_items:
-        return ""
+        fallback_content = markdown.markdown(raw_threat)
+        box_content = f'<div class="threat-val">{fallback_content}</div>'
+    else:
+        box_content = f'<div class="threat-grid">{"".join(grid_items)}</div>'
 
     box_html = f"""
     <div class="threat-card-box">
         <div class="threat-card-title">🛡️ Threat Modeling & Secure Design Lesson</div>
-        <div class="threat-grid">
-            {"".join(grid_items)}
-        </div>
+        {box_content}
     </div>
     """
     return box_html
@@ -1080,7 +1084,9 @@ def parse_markdown_to_premium_html(md_path, today_str):
             if threat_block_match:
                 raw_threat = threat_block_match.group(1).strip()
                 threat_box_html = format_threat_modeling_box(raw_threat)
-                cleaned_art_body = cleaned_art_body.replace(threat_block_match.group(0), "")
+                # Replace only if box formatting succeeded
+                if threat_box_html:
+                    cleaned_art_body = cleaned_art_body.replace(threat_block_match.group(0), "")
 
             rendered_body = markdown.markdown(cleaned_art_body)
             
@@ -1088,6 +1094,7 @@ def parse_markdown_to_premium_html(md_path, today_str):
                 "Description &amp; Context": ("📌 Description & Context", ""),
                 "TTPs &amp; Exploitation Vectors": ("⚡ TTPs & Exploitation Vectors", ""),
                 "Pentesting Value &amp; Testing Method": ("🎯 Pentesting Value & Testing Method", ""),
+                "Threat Modeling &amp; Secure Design Lesson": ("🛡️ Threat Modeling & Secure Design Lesson", "purple-hdr"),
                 "Remediation": ("🔧 Remediation & Mitigations", "")
             }
             
@@ -1108,11 +1115,12 @@ def parse_markdown_to_premium_html(md_path, today_str):
 
             # FALLBACK POST-MARKDOWN CHECK: If Threat Modeling wasn't caught pre-markdown, catch it post-markdown!
             if not threat_box_html:
-                post_threat_match = re.search(r'(?:<p><strong>|<div[^>]*>)Threat Modeling &amp; Secure Design Lesson.*?(?:</strong></p>|</div>)(.*?)(?=<div class="section-header">|<h2>|<h3|</div>\s*</div>|$)', rendered_body, re.DOTALL | re.IGNORECASE)
+                post_threat_match = re.search(r'(?:<p><strong>|<div[^>]*>)Threat Modeling &amp; Secure Design Lesson.*?(?:<\/strong><\/p>|<\/div>)(.*?)(?=<div class="section-header">|<h2>|<h3|<\/div>\s*<\/div>|$)', rendered_body, re.DOTALL | re.IGNORECASE)
                 if post_threat_match:
                     raw_post_threat = post_threat_match.group(1).strip()
                     threat_box_html = format_threat_modeling_box(raw_post_threat)
-                    rendered_body = rendered_body.replace(post_threat_match.group(0), "")
+                    if threat_box_html:
+                        rendered_body = rendered_body.replace(post_threat_match.group(0), "")
 
             # Re-insert cleanly structured Threat Modeling Grid Box
             if threat_box_html:
