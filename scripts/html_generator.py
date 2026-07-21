@@ -480,6 +480,93 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .tag-cloud {{ background: rgba(6, 182, 212, 0.15); color: #67e8f9; border: 1px solid rgba(6, 182, 212, 0.3); }}
         .tag-infra {{ background: rgba(100, 116, 139, 0.15); color: #cbd5e1; border: 1px solid rgba(100, 116, 139, 0.3); }}
         .tag-news {{ background: rgba(234, 179, 8, 0.15); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.3); }}
+        .tag-npm {{ background: rgba(203, 60, 60, 0.15); color: #f87171; border: 1px solid rgba(203, 60, 60, 0.3); }}
+        .tag-pypi {{ background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }}
+        .tag-go {{ background: rgba(0, 173, 181, 0.15); color: #00adb5; border: 1px solid rgba(0, 173, 181, 0.3); }}
+        .tag-maven {{ background: rgba(243, 156, 18, 0.15); color: #f39c12; border: 1px solid rgba(243, 156, 18, 0.3); }}
+        .tag-cargo {{ background: rgba(230, 126, 34, 0.15); color: #e67e22; border: 1px solid rgba(230, 126, 34, 0.3); }}
+
+        /* Ecosystem Box */
+        .ecosystem-card-box {{
+            background: rgba(56, 189, 248, 0.05);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-left: 4px solid var(--accent-primary);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }}
+
+        .ecosystem-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }}
+
+        .ecosystem-item {{
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }}
+
+        .ecosystem-key {{
+            font-size: 0.7rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            color: var(--accent-primary);
+            text-transform: uppercase;
+        }}
+
+        .ecosystem-val {{
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            font-weight: 600;
+        }}
+
+        /* Developer PR Checklist Box */
+        .dev-checklist-box {{
+            background: rgba(16, 185, 129, 0.05);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            border-left: 4px solid var(--accent-success);
+            border-radius: 12px;
+            padding: 1.1rem;
+            margin-top: 1.1rem;
+        }}
+
+        .dev-checklist-title {{
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #a7f3d0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.6rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }}
+
+        .dev-checklist-list {{
+            list-style-type: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-left: 0 !important;
+        }}
+
+        .dev-checklist-item {{
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            font-size: 0.92rem;
+            color: #cbd5e1;
+            line-height: 1.4;
+        }}
+
+        .dev-checklist-checkbox {{
+            margin-top: 0.25rem;
+            accent-color: var(--accent-success);
+            cursor: not-allowed;
+        }}
 
         /* Article Content Section Headers */
         .article-content {{
@@ -774,6 +861,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <button class="btn-filter" onclick="filterTag('cloud')">Cloud</button>
                 <button class="btn-filter" onclick="filterTag('infra')">Infra</button>
                 <button class="btn-filter" onclick="filterTag('news')">📰 News</button>
+                <button class="btn-filter" onclick="filterTag('npm')">NPM</button>
+                <button class="btn-filter" onclick="filterTag('pypi')">PyPI</button>
+                <button class="btn-filter" onclick="filterTag('go')">Go</button>
+                <button class="btn-filter" onclick="filterTag('maven')">Maven</button>
+                <button class="btn-filter" onclick="filterTag('cargo')">Cargo</button>
             </div>
             <div class="filter-status" id="filterStatus">Showing {total_count} of {total_count} findings</div>
         </div>
@@ -954,6 +1046,99 @@ def format_threat_modeling_box(raw_threat):
     """
     return box_html
 
+def format_ecosystem_box(raw_ecosystem):
+    """Format raw ecosystem details into a clean box."""
+    clean = re.sub(r'</?[^>]+>', ' ', raw_ecosystem)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+
+    m_package = re.search(r'(?:Package\s*Name|Package)\s*:?\s*(.*?)(?=(?:Ecosystem|Patched\s*Version|Advisory\s*Identifier|$))', clean, re.IGNORECASE)
+    m_eco = re.search(r'(?:Ecosystem)\s*:?\s*(.*?)(?=(?:Patched\s*Version|Advisory\s*Identifier|$))', clean, re.IGNORECASE)
+    m_patch = re.search(r'(?:Patched\s*Version|Patched)\s*:?\s*(.*?)(?=(?:Advisory\s*Identifier|$))', clean, re.IGNORECASE)
+    m_advisory = re.search(r'(?:Advisory\s*Identifier|Advisory|Identifier)\s*:?\s*(.*)', clean, re.IGNORECASE)
+
+    def extract_val(match):
+        if not match:
+            return ""
+        val = match.group(1).strip()
+        val = re.sub(r'^[*_`:\s-]+|[*_`"\s]+$', '', val).strip()
+        return val
+
+    pkg_val = extract_val(m_package)
+    eco_val = extract_val(m_eco)
+    patch_val = extract_val(m_patch)
+    adv_val = extract_val(m_advisory)
+
+    grid_items = []
+    if pkg_val:
+        grid_items.append(f"""
+            <div class="ecosystem-item">
+                <span class="ecosystem-key">Package Name</span>
+                <span class="ecosystem-val"><code>{pkg_val}</code></span>
+            </div>""")
+    if eco_val:
+        grid_items.append(f"""
+            <div class="ecosystem-item">
+                <span class="ecosystem-key">Ecosystem</span>
+                <span class="ecosystem-val"><span class="tag-pill tag-{eco_val.lower().replace(' ', '')}">{eco_val}</span></span>
+            </div>""")
+    if patch_val:
+        grid_items.append(f"""
+            <div class="ecosystem-item">
+                <span class="ecosystem-key">Patched Version</span>
+                <span class="ecosystem-val"><code>{patch_val}</code></span>
+            </div>""")
+    if adv_val:
+        grid_items.append(f"""
+            <div class="ecosystem-item">
+                <span class="ecosystem-key">Advisory Ref</span>
+                <span class="ecosystem-val">{adv_val}</span>
+            </div>""")
+
+    if not grid_items:
+        return ""
+
+    box_html = f"""
+    <div class="ecosystem-card-box">
+        <div class="ecosystem-grid">
+            {"".join(grid_items)}
+        </div>
+    </div>
+    """
+    return box_html
+
+def format_dev_checklist_box(raw_checklist):
+    """Format developer PR checklist into checkbox list items."""
+    items = re.findall(r'(?:[-*•]\s+)?\[\s*[xX]?\s*\]\s*(.*?)(?=\n|$)', raw_checklist)
+    if not items:
+        lines = [line.strip().strip('*-• ') for line in raw_checklist.split('\n') if line.strip()]
+        items = [line for line in lines if len(line) > 5]
+
+    list_items = []
+    for idx, item in enumerate(items):
+        item_clean = re.sub(r'^[*_`:\s-]+|[*_`"\s]+$', '', item).strip()
+        if item_clean:
+            list_items.append(f"""
+                <li class="dev-checklist-item">
+                    <input type="checkbox" class="dev-checklist-checkbox" id="chk-{idx}" disabled checked>
+                    <span>{item_clean}</span>
+                </li>""")
+
+    if not list_items:
+        return ""
+
+    box_html = f"""
+    <div class="dev-checklist-box">
+        <div class="dev-checklist-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-success);"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Developer PR Review Checklist
+        </div>
+        <ul class="dev-checklist-list">
+            {"".join(list_items)}
+        </ul>
+    </div>
+    """
+    return box_html
+
 def parse_markdown_to_premium_html(md_path, today_str):
     with open(md_path, "r", encoding="utf-8") as f:
         md_content = f.read()
@@ -1081,14 +1266,32 @@ def parse_markdown_to_premium_html(md_path, today_str):
                 pattern = r'\*\*' + re.escape(h) + r'\*\*:\s*(\S)'
                 cleaned_art_body = re.sub(pattern, r'**' + h + r'**:\n\n\1', cleaned_art_body, flags=re.IGNORECASE)
 
-            # Extract Threat Modeling block cleanly (whether on same line or next line)
-            threat_block_match = re.search(r'\*\*Threat Modeling & Secure Design Lesson\*\*:\s*(.*?)(?=\*\*Remediation\*\*|$)', cleaned_art_body, re.DOTALL | re.IGNORECASE)
+            # Extract Threat Modeling block cleanly
+            threat_block_match = re.search(r'\*\*Threat Modeling & Secure Design Lesson\*\*:\s*(.*?)(?=\*\*Dependency & Package Ecosystem Details\*\*|\*\*Developer PR Review Checklist\*\*|\*\*Remediation\*\*|$)', cleaned_art_body, re.DOTALL | re.IGNORECASE)
             threat_box_html = ""
             if threat_block_match:
                 raw_threat = threat_block_match.group(1).strip()
                 threat_box_html = format_threat_modeling_box(raw_threat)
                 if threat_box_html:
                     cleaned_art_body = cleaned_art_body.replace(threat_block_match.group(0), "")
+
+            # Extract Dependency Ecosystem Details block
+            eco_block_match = re.search(r'\*\*Dependency & Package Ecosystem Details\*\*:\s*(.*?)(?=\*\*Developer PR Review Checklist\*\*|\*\*Remediation\*\*|$)', cleaned_art_body, re.DOTALL | re.IGNORECASE)
+            eco_box_html = ""
+            if eco_block_match:
+                raw_eco = eco_block_match.group(1).strip()
+                eco_box_html = format_ecosystem_box(raw_eco)
+                if eco_box_html:
+                    cleaned_art_body = cleaned_art_body.replace(eco_block_match.group(0), "")
+
+            # Extract Developer PR Review Checklist block
+            checklist_block_match = re.search(r'\*\*Developer PR Review Checklist\*\*:\s*(.*?)(?=\*\*Remediation\*\*|$)', cleaned_art_body, re.DOTALL | re.IGNORECASE)
+            checklist_box_html = ""
+            if checklist_block_match:
+                raw_checklist = checklist_block_match.group(1).strip()
+                checklist_box_html = format_dev_checklist_box(raw_checklist)
+                if checklist_box_html:
+                    cleaned_art_body = cleaned_art_body.replace(checklist_block_match.group(0), "")
 
             rendered_body = markdown.markdown(cleaned_art_body)
             
@@ -1097,6 +1300,8 @@ def parse_markdown_to_premium_html(md_path, today_str):
                 "TTPs &amp; Exploitation Vectors": ("⚡ TTPs & Exploitation Vectors", ""),
                 "Pentesting Value &amp; Testing Method": ("🎯 Pentesting Value & Testing Method", ""),
                 "Threat Modeling &amp; Secure Design Lesson": ("🛡️ Threat Modeling & Secure Design Lesson", "purple-hdr"),
+                "Dependency &amp; Package Ecosystem Details": ("📦 Dependency & Package Ecosystem Details", ""),
+                "Developer PR Review Checklist": ("📋 Developer PR Review Checklist", ""),
                 "Remediation": ("🔧 Remediation & Mitigations", "")
             }
             
@@ -1124,9 +1329,13 @@ def parse_markdown_to_premium_html(md_path, today_str):
                     if threat_box_html:
                         rendered_body = rendered_body.replace(post_threat_match.group(0), "")
 
-            # Re-insert cleanly structured Threat Modeling Grid Box
+            # Re-insert cleanly structured Threat Modeling, Ecosystem details, and Dev Checklist Boxes
             if threat_box_html:
                 rendered_body += threat_box_html
+            if eco_box_html:
+                rendered_body += eco_box_html
+            if checklist_box_html:
+                rendered_body += checklist_box_html
 
             tags_html = "".join([f'<span class="tag-pill tag-{t}">{t}</span>' for t in tags])
             

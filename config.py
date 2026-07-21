@@ -79,7 +79,12 @@ PENTEST_TAGS = [
     "thickclient",
     "cloud",
     "infra",
-    "news"
+    "news",
+    "npm",
+    "pypi",
+    "go",
+    "maven",
+    "cargo"
 ]
 
 def get_logger(name):

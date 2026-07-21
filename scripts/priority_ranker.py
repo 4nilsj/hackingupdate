@@ -60,7 +60,12 @@ FALLBACK_KEYWORDS = {
     "news": [
         "breach", "cyberattack", "hack", "ransomware", "data leak", "policy", "regulation", "lawsuit",
         "ai security", "threat actor", "apt", "group", "incident", "advisory", "security news", "stolen"
-    ]
+    ],
+    "npm": ["npm", "node_modules", "package.json", "express", "react", "next.js", "vue", "angular", "javascript package"],
+    "pypi": ["pypi", "python package", "pip", "requirements.txt", "django", "flask", "fastapi", "setup.py", "wheels"],
+    "go": ["golang", "go module", "go.mod", "go.sum", "x/net", "gin-gonic", "gorilla"],
+    "maven": ["maven", "gradle", "pom.xml", "jar", "spring boot", "struts", "log4j", "apache commons", "java package"],
+    "cargo": ["cargo", "crates.io", "rust crate", "cargo.toml", "rust security"]
 }
 
 def fallback_rank_and_tag(article):

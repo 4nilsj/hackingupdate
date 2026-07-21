@@ -175,6 +175,16 @@ Structure of your output report:
      - *Design Flaw*: [State the architectural design-level root cause]
      - *Secure Design Principle*: [e.g., Least Privilege / Defense in Depth / Fail-Safe Defaults]
      - *Secure Design Review Question*: [1 specific question for engineers/reviewers to ask during architecture design reviews to prevent this bug]
+   - **Dependency & Package Ecosystem Details**: (Only include this if the vulnerability is in a library, package, or third-party dependency. Otherwise, skip/omit it.)
+     Write a short block containing:
+     - *Package Name*: [e.g., `express`, `requests`, `spring-web`]
+     - *Ecosystem*: [e.g., npm / PyPI / Go / Java Maven / Cargo]
+     - *Patched Version*: [e.g., `>= 4.19.2`, `>= 2.31.0`]
+     - *Advisory Identifier*: [e.g., GHSA ID / CVE ID]
+   - **Developer PR Review Checklist**: (Only include this section for articles with a Priority Rank >= 7. Otherwise, skip/omit it.)
+     Write 2 to 3 actionable checkpoints for pull request reviewers:
+     - `[ ]` [Specific code check or sanitization verification detail]
+     - `[ ]` [Check configuration default or dependency update verification]
    - **Remediation**: 1-2 sentences on how organizations should patch or mitigate the risk.
 5. End with a list of References (Titles and Links).
 
