@@ -1191,7 +1191,10 @@ def main():
         html_content = parse_markdown_to_premium_html(md_report_file, today_str)
         with open(html_report_file, "w", encoding="utf-8") as f:
             f.write(html_content)
-        logger.info(f"Successfully generated HTML report at: {html_report_file}")
+        index_report_file = config.REPORTS_DIR / "index.html"
+        with open(index_report_file, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        logger.info(f"Successfully generated HTML report at: {html_report_file} and {index_report_file}")
     except Exception as e:
         logger.critical(f"Failed to generate HTML report: {e}")
         sys.exit(1)
