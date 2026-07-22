@@ -198,6 +198,7 @@ CRITICAL FORMATTING RULES:
 1. Do NOT prefix the bold section headers (like **Description & Context**, **TTPs & Exploitation Vectors**, **Pentesting Value & Testing Method**, **Threat Modeling & Secure Design Lesson**, and **Remediation**) with bullet points (like * or -). Write them on their own lines as plain text headers, e.g., '**TTPs & Exploitation Vectors**:'.
 2. Insert a double newline (blank line) after each section header and before its contents or bullet list, to ensure markdown compiles lists cleanly.
 3. Return ONLY the markdown output. Do not wrap in extra chat markup like triple backticks (e.g. ```markdown), just return the raw markdown string.
+4. When writing about multiple CVEs or explaining individual CVEs, always list each CVE on a new line as a bullet point (using '*') rather than embedding them in a paragraph or as a single inline sentence.
 
 """
 
