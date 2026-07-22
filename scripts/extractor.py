@@ -6,9 +6,11 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import time
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from hackingupdate.config import (
+    get_logger, RAW_CACHE_FILE, FULL_CACHE_FILE, ARTICLE_MAX_AGE_DAYS,
+)
+
+import hackingupdate.config as config
 
 logger = config.get_logger("extractor")
 
@@ -62,8 +64,8 @@ def parse_normalized_date(entry):
     # Default to None if missing or unparseable (will be filtered out)
     return None
 
-# Maximum age of articles to include (in days)
-MAX_ARTICLE_AGE_DAYS = 1
+# Maximum age of articles to include (in days) — configurable via ARTICLE_MAX_AGE_DAYS env var
+MAX_ARTICLE_AGE_DAYS: int = ARTICLE_MAX_AGE_DAYS
 
 
 def is_article_fresh(published_date_str, max_age_days=MAX_ARTICLE_AGE_DAYS):

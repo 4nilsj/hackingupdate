@@ -4,9 +4,9 @@ from datetime import datetime
 from pathlib import Path
 import markdown
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from hackingupdate.config import get_logger, REPORTS_DIR, WORKING_CACHE_FILE
+
+import hackingupdate.config as config
 
 logger = config.get_logger("html_generator")
 

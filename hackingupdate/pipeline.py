@@ -5,12 +5,13 @@ Executes each pipeline step in sequence, with proper error handling,
 timing, and the ability to run individual steps.
 """
 
+import json
 import sys
 import time
 import importlib
 from pathlib import Path
 
-from hackingupdate.config import get_logger, CACHE_DIR
+from hackingupdate.config import get_logger, CACHE_DIR, RAW_CACHE_FILE, FULL_CACHE_FILE
 
 logger = get_logger("pipeline")
 
@@ -29,6 +30,7 @@ PIPELINE_STEPS = [
     ("rss",         "rss_generator",        "Generating RSS 2.0 feed xml"),
     ("teams",       "teams_notifier",       "Sending Teams notifications"),
     ("whatsapp",    "whatsapp_notifier",    "Sending WhatsApp notifications"),
+    ("email",       "email_notifier",       "Sending Email notifications"),
     ("prune",       "prune_logs",           "Pruning old logs"),
 ]
 
@@ -155,7 +157,7 @@ def run_pipeline(steps: list[str] | None = None, skip_cache_clear: bool = False)
         if not success:
             failed.append(name)
             # For notification steps, continue on failure
-            if name in ("teams", "whatsapp", "prune", "db_store"):
+            if name in ("teams", "whatsapp", "email", "prune", "db_store"):
                 logger.warning(f"Non-critical step '{name}' failed, continuing...")
             else:
                 logger.error(f"Critical step '{name}' failed, aborting pipeline.")
@@ -171,4 +173,47 @@ def run_pipeline(steps: list[str] | None = None, skip_cache_clear: bool = False)
 
     logger.info("=" * 60)
 
+    # Log pipeline run metrics to the database
+    _log_run_metrics(elapsed)
+
     return len(failed) == 0
+
+
+def _log_run_metrics(pipeline_duration_sec: float) -> None:
+    """Persist pipeline run metrics to the SQLite database."""
+    try:
+        scripts_dir = str(Path(__file__).resolve().parent.parent / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+
+        from scripts import db_manager
+        db_manager.init_db()
+
+        # Read article counts from cache files
+        articles_fetched = _count_items_in_json(RAW_CACHE_FILE)
+        articles_after_filter = _count_items_in_json(FULL_CACHE_FILE)
+
+        from hackingupdate.config import WORKING_CACHE_FILE
+        articles_in_working_set = _count_items_in_json(WORKING_CACHE_FILE)
+
+        db_manager.log_pipeline_run(
+            articles_fetched=articles_fetched,
+            articles_after_filter=articles_after_filter,
+            articles_stored=articles_in_working_set,
+            articles_skipped_dup=max(0, articles_fetched - articles_after_filter),
+            pipeline_duration_sec=pipeline_duration_sec,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to log pipeline run metrics: {e}")
+
+
+def _count_items_in_json(filepath: Path) -> int:
+    """Read a JSON cache file and return the number of items (assumes top-level list)."""
+    if not filepath.exists():
+        return 0
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return len(data) if isinstance(data, list) else 0
+    except Exception:
+        return 0

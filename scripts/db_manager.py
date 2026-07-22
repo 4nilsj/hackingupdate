@@ -14,9 +14,9 @@ import sqlite3
 from datetime import datetime, date
 from pathlib import Path
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from hackingupdate.config import get_logger, DB_PATH as _CONFIG_DB_PATH
+
+import hackingupdate.config as config
 
 logger = config.get_logger("db_manager")
 

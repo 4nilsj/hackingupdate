@@ -3,9 +3,9 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from hackingupdate.config import get_logger, LOG_FILE
+
+import hackingupdate.config as config
 
 logger = config.get_logger("prune_logs")
 

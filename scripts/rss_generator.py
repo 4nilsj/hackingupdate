@@ -13,9 +13,9 @@ from datetime import datetime, timezone
 from email.utils import format_datetime
 from pathlib import Path
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from hackingupdate.config import get_logger, WORKING_CACHE_FILE, REPORTS_DIR
+
+import hackingupdate.config as config
 
 logger = config.get_logger("rss_generator")
 

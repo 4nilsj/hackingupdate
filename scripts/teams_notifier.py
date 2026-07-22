@@ -5,9 +5,11 @@ import requests
 from datetime import datetime
 from pathlib import Path
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from hackingupdate.config import (
+    get_logger, TEAMS_WEBHOOK_URL, REPORTS_DIR, WORKING_CACHE_FILE,
+)
+
+import hackingupdate.config as config
 
 logger = config.get_logger("teams_notifier")
 

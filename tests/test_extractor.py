@@ -1,12 +1,6 @@
 """Unit tests for content extraction and date freshness filtering."""
 
-import sys
-from pathlib import Path
 from datetime import datetime, timedelta
-
-# Ensure scripts dir is importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts.extractor import clean_html, is_article_fresh
 

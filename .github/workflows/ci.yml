@@ -29,11 +29,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      - name: Lint with ruff
+        run: |
+          pip install ruff
+          ruff check .
+
       - name: Validate CLI entry point
         run: |
           hackingupdate --version
           hackingupdate steps
+          hackingupdate init
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         run: |
-          pytest tests/ -v
+          pytest tests/ -v --cov=hackingupdate --cov=scripts

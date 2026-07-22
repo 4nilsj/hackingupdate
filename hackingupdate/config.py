@@ -39,38 +39,54 @@ if _env_path.is_file():
 # ---------------------------------------------------------------------------
 # API Keys & Secrets
 # ---------------------------------------------------------------------------
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash:free")
+OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash:free")
 
 # Teams
-TEAMS_WEBHOOK_URL = os.getenv("TEAMS_WEBHOOK_URL", "")
+TEAMS_WEBHOOK_URL: str = os.getenv("TEAMS_WEBHOOK_URL", "")
 
 # WhatsApp (generic API)
-WHATSAPP_API_URL = os.getenv("WHATSAPP_API_URL", "")
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
-WHATSAPP_RECIPIENT = os.getenv("WHATSAPP_RECIPIENT", "")
+WHATSAPP_API_URL: str = os.getenv("WHATSAPP_API_URL", "")
+WHATSAPP_TOKEN: str = os.getenv("WHATSAPP_TOKEN", "")
+WHATSAPP_RECIPIENT: str = os.getenv("WHATSAPP_RECIPIENT", "")
 
 # Twilio WhatsApp
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
-TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "whatsapp:+14155238886")
-TWILIO_TO_NUMBER = os.getenv("TWILIO_TO_NUMBER", "")
+TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM_NUMBER: str = os.getenv("TWILIO_FROM_NUMBER", "whatsapp:+14155238886")
+TWILIO_TO_NUMBER: str = os.getenv("TWILIO_TO_NUMBER", "")
+
+# Email (SMTP)
+SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME: str = os.getenv("SMTP_USERNAME", "")
+SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "")
+SMTP_TO_EMAILS: str = os.getenv("SMTP_TO_EMAILS", "")  # Comma-separated
+SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
+
+# ---------------------------------------------------------------------------
+# Pipeline Tuning
+# ---------------------------------------------------------------------------
+ARTICLE_MAX_AGE_DAYS: int = int(os.getenv("ARTICLE_MAX_AGE_DAYS", "1"))
+LLM_BATCH_DELAY: float = float(os.getenv("LLM_BATCH_DELAY", "2"))
 
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-LOG_LEVEL_STR = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_LEVEL = getattr(logging, LOG_LEVEL_STR, logging.INFO)
+LOG_LEVEL_STR: str = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_LEVEL: int = getattr(logging, LOG_LEVEL_STR, logging.INFO)
+LOG_FORMAT: str = os.getenv("LOG_FORMAT", "text")  # "text" or "json"
 
 # ---------------------------------------------------------------------------
 # Directory Structure Paths
 # ---------------------------------------------------------------------------
-CACHE_DIR = BASE_DIR / "cache"
-FEEDS_DIR = BASE_DIR / "feeds"
-REPORTS_DIR = BASE_DIR / "reports"
-SCRIPTS_DIR = BASE_DIR / "scripts"
-LOGS_DIR = BASE_DIR / "logs"
-DATA_DIR = BASE_DIR / "data"
+CACHE_DIR: Path = BASE_DIR / "cache"
+FEEDS_DIR: Path = BASE_DIR / "feeds"
+REPORTS_DIR: Path = BASE_DIR / "reports"
+SCRIPTS_DIR: Path = BASE_DIR / "scripts"
+LOGS_DIR: Path = BASE_DIR / "logs"
+DATA_DIR: Path = BASE_DIR / "data"
 
 # Ensure all directories exist
 for _directory in [CACHE_DIR, FEEDS_DIR, REPORTS_DIR, LOGS_DIR, DATA_DIR]:
@@ -79,44 +95,61 @@ for _directory in [CACHE_DIR, FEEDS_DIR, REPORTS_DIR, LOGS_DIR, DATA_DIR]:
 # ---------------------------------------------------------------------------
 # SQLite Database
 # ---------------------------------------------------------------------------
-DB_PATH = DATA_DIR / "hackingupdate.db"
+DB_PATH: Path = DATA_DIR / "hackingupdate.db"
 
 # ---------------------------------------------------------------------------
 # Cache Files
 # ---------------------------------------------------------------------------
-RAW_CACHE_FILE = CACHE_DIR / "articles_raw.json"
-FULL_CACHE_FILE = CACHE_DIR / "articles_full.json"
-FINGERPRINT_CACHE_FILE = CACHE_DIR / "articles_fingerprints.json"
-DEDUPED_CACHE_FILE = CACHE_DIR / "articles_deduped.json"
-RANKED_CACHE_FILE = CACHE_DIR / "articles_ranked.json"
-WORKING_CACHE_FILE = CACHE_DIR / "articles_working.json"
+RAW_CACHE_FILE: Path = CACHE_DIR / "articles_raw.json"
+FULL_CACHE_FILE: Path = CACHE_DIR / "articles_full.json"
+FINGERPRINT_CACHE_FILE: Path = CACHE_DIR / "articles_fingerprints.json"
+DEDUPED_CACHE_FILE: Path = CACHE_DIR / "articles_deduped.json"
+RANKED_CACHE_FILE: Path = CACHE_DIR / "articles_ranked.json"
+WORKING_CACHE_FILE: Path = CACHE_DIR / "articles_working.json"
 
 # ---------------------------------------------------------------------------
 # Feed Config
 # ---------------------------------------------------------------------------
-FEEDS_FILE = FEEDS_DIR / "feeds.txt"
+FEEDS_FILE: Path = FEEDS_DIR / "feeds.txt"
 
 # ---------------------------------------------------------------------------
 # Log File
 # ---------------------------------------------------------------------------
-LOG_FILE = LOGS_DIR / "daily_brief.log"
+LOG_FILE: Path = LOGS_DIR / "daily_brief.log"
 
 # ---------------------------------------------------------------------------
-# Setup logging (file + console)
+# Setup logging (file + console, with optional JSON format)
 # ---------------------------------------------------------------------------
+_log_handlers: list[logging.Handler] = [
+    logging.FileHandler(LOG_FILE, encoding="utf-8"),
+]
+
+if LOG_FORMAT == "json":
+    try:
+        from pythonjsonlogger import jsonlogger
+        _json_formatter = jsonlogger.JsonFormatter(
+            "%(asctime)s %(levelname)s %(name)s %(message)s",
+            timestamp=True,
+        )
+        _console_handler = logging.StreamHandler()
+        _console_handler.setFormatter(_json_formatter)
+        _log_handlers.append(_console_handler)
+    except ImportError:
+        # Fallback to text if python-json-logger not installed
+        _log_handlers.append(logging.StreamHandler())
+else:
+    _log_handlers.append(logging.StreamHandler())
+
 logging.basicConfig(
     level=LOG_LEVEL,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
+    handlers=_log_handlers,
 )
 
 # ---------------------------------------------------------------------------
-# Standard Security Tags
+# Standard Security Tags (merged from both config files)
 # ---------------------------------------------------------------------------
-PENTEST_TAGS = [
+PENTEST_TAGS: list[str] = [
     "web",
     "mobile",
     "API",
@@ -124,6 +157,12 @@ PENTEST_TAGS = [
     "thickclient",
     "cloud",
     "infra",
+    "news",
+    "npm",
+    "pypi",
+    "go",
+    "maven",
+    "cargo",
 ]
 
 

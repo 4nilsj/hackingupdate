@@ -1,11 +1,17 @@
 import sys
 import json
+import time
 import requests
 from pathlib import Path
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+from hackingupdate.config import (
+    get_logger, OPENROUTER_API_KEY, OPENROUTER_MODEL, PENTEST_TAGS,
+    DEDUPED_CACHE_FILE, RANKED_CACHE_FILE, LLM_BATCH_DELAY,
+)
+
+import hackingupdate.config as config
 
 logger = config.get_logger("priority_ranker")
 
@@ -107,7 +113,8 @@ def fallback_rank_and_tag(article):
         "reason": f"Fallback: Tagged via keyword heuristics matching {[t for t in assigned_tags]}."
     }
 
-def rank_batch_with_llm(batch):
+def rank_batch_with_llm(batch: list[dict]) -> list[dict]:
+    """Rank a batch of articles using LLM with fallback to keyword heuristics."""
     if not config.OPENROUTER_API_KEY:
         logger.warning("OPENROUTER_API_KEY not set. Using keyword-based fallback ranking.")
         return [fallback_rank_and_tag(art) for art in batch]
@@ -164,20 +171,7 @@ You MUST return ONLY a valid JSON object in the following format (do not wrap in
     }
 
     try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
-        response.raise_for_status()
-        res_data = response.json()
-        
-        choices = res_data.get("choices", [])
-        if not choices:
-            raise ValueError(f"Empty choices from OpenRouter response: {res_data}")
-            
-        content_str = choices[0]["message"]["content"].strip()
+        content_str = _call_openrouter_with_retry(headers, payload)
         # Parse JSON
         results = json.loads(content_str)
         rankings = results.get("rankings", [])
@@ -202,8 +196,35 @@ You MUST return ONLY a valid JSON object in the following format (do not wrap in
         return final_batch
 
     except Exception as e:
-        logger.error(f"OpenRouter API call failed: {e}. Falling back to keyword ranking.")
+        logger.error(f"OpenRouter API call failed after retries: {e}. Falling back to keyword ranking.")
         return [fallback_rank_and_tag(art) for art in batch]
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=16),
+    retry=retry_if_exception_type((requests.exceptions.HTTPError, requests.exceptions.ConnectionError, requests.exceptions.Timeout)),
+    before_sleep=lambda retry_state: logger.warning(
+        f"LLM API request failed, retrying in {retry_state.next_action.sleep:.0f}s... "
+        f"(attempt {retry_state.attempt_number}/3)"
+    ),
+)
+def _call_openrouter_with_retry(headers: dict, payload: dict) -> str:
+    """Make an OpenRouter API call with automatic retry on transient errors."""
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=30
+    )
+    response.raise_for_status()
+    res_data = response.json()
+    
+    choices = res_data.get("choices", [])
+    if not choices:
+        raise ValueError(f"Empty choices from OpenRouter response: {res_data}")
+        
+    return choices[0]["message"]["content"].strip()
 
 def main():
     if not config.DEDUPED_CACHE_FILE.exists():
@@ -226,6 +247,11 @@ def main():
         batch = articles[i:i+batch_size]
         logger.info(f"Ranking batch {i//batch_size + 1} of {(len(articles)-1)//batch_size + 1} ({len(batch)} articles)...")
         batch_ranked = rank_batch_with_llm(batch)
+
+        # Rate-limit delay between batches (configurable via LLM_BATCH_DELAY env var)
+        if i + batch_size < len(articles) and config.LLM_BATCH_DELAY > 0:
+            logger.info(f"Waiting {config.LLM_BATCH_DELAY:.1f}s between batches for rate-limit safety...")
+            time.sleep(config.LLM_BATCH_DELAY)
         
         # Combine ranking metadata with original article details
         for art, rank_meta in zip(batch, batch_ranked):

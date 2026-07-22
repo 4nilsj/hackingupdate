@@ -1,12 +1,8 @@
 """Unit tests for SQLite database manager and duplicate prevention."""
 
-import sys
 import sqlite3
 from pathlib import Path
 from datetime import date
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts import db_manager
 

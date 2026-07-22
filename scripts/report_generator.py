@@ -5,9 +5,14 @@ from datetime import datetime
 from pathlib import Path
 import re
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+from hackingupdate.config import (
+    get_logger, OPENROUTER_API_KEY, OPENROUTER_MODEL, PENTEST_TAGS,
+    WORKING_CACHE_FILE, REPORTS_DIR,
+)
+
+import hackingupdate.config as config
 
 logger = config.get_logger("report_generator")
 
@@ -211,19 +216,7 @@ CRITICAL FORMATTING RULES:
     }
 
     try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=60
-        )
-        response.raise_for_status()
-        res_data = response.json()
-        choices = res_data.get("choices", [])
-        if not choices:
-            raise ValueError(f"Empty choices in OpenRouter response: {res_data}")
-        
-        content = choices[0]["message"]["content"].strip()
+        content = _call_openrouter_report_with_retry(headers, payload)
         # Clean potential LLM markdown wrapper lines
         if content.startswith("```markdown"):
             content = content[11:]
@@ -232,8 +225,34 @@ CRITICAL FORMATTING RULES:
         return content.strip()
 
     except Exception as e:
-        logger.error(f"OpenRouter report generation failed: {e}. Falling back to template-based generator.")
+        logger.error(f"OpenRouter report generation failed after retries: {e}. Falling back to template-based generator.")
         return generate_local_fallback_report(working_set, today_str)
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=2, max=16),
+    retry=retry_if_exception_type((requests.exceptions.HTTPError, requests.exceptions.ConnectionError, requests.exceptions.Timeout)),
+    before_sleep=lambda retry_state: logger.warning(
+        f"Report LLM API request failed, retrying in {retry_state.next_action.sleep:.0f}s... "
+        f"(attempt {retry_state.attempt_number}/3)"
+    ),
+)
+def _call_openrouter_report_with_retry(headers: dict, payload: dict) -> str:
+    """Make an OpenRouter API call for report generation with automatic retry."""
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=60
+    )
+    response.raise_for_status()
+    res_data = response.json()
+    choices = res_data.get("choices", [])
+    if not choices:
+        raise ValueError(f"Empty choices in OpenRouter response: {res_data}")
+    
+    return choices[0]["message"]["content"].strip()
 
 def main():
     if not config.WORKING_CACHE_FILE.exists():

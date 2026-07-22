@@ -2,9 +2,11 @@ import sys
 import json
 from pathlib import Path
 
-# Add project root to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-import config
+from hackingupdate.config import (
+    get_logger, FULL_CACHE_FILE, FINGERPRINT_CACHE_FILE, DEDUPED_CACHE_FILE,
+)
+
+import hackingupdate.config as config
 
 logger = config.get_logger("dedupe_fingerprints")
 
