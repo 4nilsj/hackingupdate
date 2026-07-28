@@ -687,6 +687,42 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             line-height: 1.5;
         }}
 
+        /* Point-wise Design Review Questions List */
+        .design-review-list {{
+            margin-top: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+            list-style: none;
+            padding: 0;
+        }}
+
+        .design-review-list li {{
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            background: rgba(192, 132, 252, 0.06);
+            border: 1px solid rgba(192, 132, 252, 0.18);
+            padding: 0.55rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.91rem;
+            color: #f1f5f9;
+            line-height: 1.5;
+        }}
+
+        .review-bullet {{
+            color: #c084fc;
+            font-weight: 800;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            flex-shrink: 0;
+        }}
+
+        .review-text {{
+            color: #f1f5f9;
+            font-size: 0.91rem;
+        }}
+
         /* References / Footer */
         .references {{
             background: var(--card-bg);
@@ -1022,17 +1058,40 @@ def format_threat_modeling_box(raw_threat):
                 <span class="threat-val">{principle_val}</span>
             </div>""")
     if question_val:
+        # Format question_val cleanly as point-wise bullet list items
+        q_clean = re.sub(r'&(?:ldquo|rdquo|quot);', '"', question_val)
+        q_clean = re.sub(r'^["`\s-]+|["`\s]+$', '', q_clean).strip()
+        
+        # Split into individual questions or points
+        raw_points = re.split(r'(?:\r?\n|[-*•]\s+|\s*\?\s+|\s*;\s*)', q_clean)
+        points = []
+        for p in raw_points:
+            p_strip = p.strip().strip('"`*_ ')
+            if not p_strip:
+                continue
+            if not p_strip.endswith('?') and not p_strip.endswith('.'):
+                p_strip += '?'
+            if len(p_strip) > 5 and p_strip not in points:
+                points.append(p_strip)
+        
+        if not points and q_clean:
+            points = [q_clean]
+            
+        list_lis = "".join([f'<li><span class="review-bullet">✦</span><span class="review-text">{pt}</span></li>' for pt in points])
+        
         grid_items.append(f"""
-            <div class="threat-item full-width">
-                <span class="threat-key">Design Review Question</span>
-                <span class="review-quote">&ldquo;{question_val}&rdquo;</span>
+            <div class="threat-item full-width design-review-item">
+                <span class="threat-key">📋 Secure Design Review Questions</span>
+                <ul class="design-review-list">
+                    {list_lis}
+                </ul>
             </div>""")
 
     # Fallback to point-wise list if key regex matching was empty
     if not grid_items:
         sentences = [s.strip().strip('*_- ') for s in clean.split('.') if s.strip()]
-        list_items = "".join([f'<li style="margin-bottom:0.4rem;">{s}.</li>' for s in sentences])
-        box_content = f'<ul style="margin-left:1.2rem; color:#cbd5e1;">{list_items}</ul>'
+        list_items = "".join([f'<li><span class="review-bullet">✦</span><span class="review-text">{s}.</span></li>' for s in sentences])
+        box_content = f'<ul class="design-review-list">{list_items}</ul>'
     else:
         box_content = f'<div class="threat-grid">{"".join(grid_items)}</div>'
 
@@ -1199,6 +1258,9 @@ def parse_markdown_to_premium_html(md_path, today_str):
     high_count = 0
     total_count = 0
 
+    seen_articles = {}  # key: norm_key -> dict of article metadata & rendered content
+    article_keys_order = []
+
     for section in sections:
         if not section.strip():
             continue
@@ -1212,7 +1274,6 @@ def parse_markdown_to_premium_html(md_path, today_str):
 
         category_content = "\n".join(lines[1:])
         articles = re.split(r'\n###\s+', '\n' + category_content)
-        category_html_cards = []
         
         for art in articles:
             if not art.strip():
@@ -1233,18 +1294,20 @@ def parse_markdown_to_premium_html(md_path, today_str):
             rank_str = rank_match.group(1).strip() if rank_match else "5"
             rank_num = int(rank_str) if rank_str.isdigit() else 5
             link = link_match.group(1).strip().strip('*_`()[] ') if link_match else "#"
-            
-            total_count += 1
-            if rank_num >= 8:
-                critical_count += 1
-            elif rank_num >= 6:
-                high_count += 1
 
             tags = []
             if tags_match:
                 tags = [t.strip().strip('`#_* ').lower() for t in re.split(r'[,\s]+', tags_match.group(1)) if t.strip()]
             else:
                 tags = [category_name.lower()]
+
+            norm_key = (art_title.strip().lower(), link.strip().lower())
+            if norm_key in seen_articles:
+                # Merge secondary tags into existing post card
+                for t in tags:
+                    if t not in seen_articles[norm_key]["tags"]:
+                        seen_articles[norm_key]["tags"].append(t)
+                continue
 
             cleaned_art_body = art_body
             for m_match in [source_match, rank_match, link_match, tags_match]:
@@ -1327,54 +1390,84 @@ def parse_markdown_to_premium_html(md_path, today_str):
                     if threat_box_html:
                         rendered_body = rendered_body.replace(post_threat_match.group(0), "")
 
-            # Re-insert cleanly structured Threat Modeling, Ecosystem details, and Dev Checklist Boxes
-            if threat_box_html:
-                rendered_body += threat_box_html
-            if eco_box_html:
-                rendered_body += eco_box_html
-            if checklist_box_html:
-                rendered_body += checklist_box_html
+            # Store unique article details
+            seen_articles[norm_key] = {
+                "title": art_title,
+                "source": source,
+                "rank_num": rank_num,
+                "link": link,
+                "tags": tags,
+                "category": category_name,
+                "rendered_body": rendered_body,
+                "threat_box_html": threat_box_html,
+                "eco_box_html": eco_box_html,
+                "checklist_box_html": checklist_box_html
+            }
+            article_keys_order.append(norm_key)
 
-            tags_html = "".join([f'<span class="tag-pill tag-{t}">{t}</span>' for t in tags])
-            
-            if rank_num >= 8:
-                rank_class = "rank-critical"
-                card_extra_class = "critical-card"
-            elif rank_num >= 6:
-                rank_class = "rank-high"
-                card_extra_class = ""
-            else:
-                rank_class = "rank-medium"
-                card_extra_class = ""
+    # Group unique articles by category and build HTML cards
+    category_grouped_html = {}
+    for key in article_keys_order:
+        art_info = seen_articles[key]
+        rank_num = art_info["rank_num"]
+        
+        total_count += 1
+        if rank_num >= 8:
+            critical_count += 1
+        elif rank_num >= 6:
+            high_count += 1
 
-            card_html = f"""
-            <div class="article-card {card_extra_class}">
-                <div class="article-header">
-                    <a href="{link}" class="article-title-link" target="_blank">{art_title}</a>
-                    <span class="rank-badge {rank_class}">Rank {rank_num}/10</span>
-                </div>
-                <div class="article-meta">
-                    <span class="meta-source">📍 {source}</span>
-                    <span class="meta-separator">•</span>
-                    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-                        {tags_html}
-                    </div>
-                </div>
-                <div class="article-content">
-                    {rendered_body}
+        tags_html = "".join([f'<span class="tag-pill tag-{t}">{t}</span>' for t in art_info["tags"]])
+        
+        if rank_num >= 8:
+            rank_class = "rank-critical"
+            card_extra_class = "critical-card"
+        elif rank_num >= 6:
+            rank_class = "rank-high"
+            card_extra_class = ""
+        else:
+            rank_class = "rank-medium"
+            card_extra_class = ""
+
+        full_body = art_info["rendered_body"]
+        if art_info["threat_box_html"]:
+            full_body += art_info["threat_box_html"]
+        if art_info["eco_box_html"]:
+            full_body += art_info["eco_box_html"]
+        if art_info["checklist_box_html"]:
+            full_body += art_info["checklist_box_html"]
+
+        card_html = f"""
+        <div class="article-card {card_extra_class}">
+            <div class="article-header">
+                <a href="{art_info['link']}" class="article-title-link" target="_blank">{art_info['title']}</a>
+                <span class="rank-badge {rank_class}">Rank {rank_num}/10</span>
+            </div>
+            <div class="article-meta">
+                <span class="meta-source">📍 {art_info['source']}</span>
+                <span class="meta-separator">•</span>
+                <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                    {tags_html}
                 </div>
             </div>
-            """
-            category_html_cards.append(card_html)
-            
-        if category_html_cards:
-            section_html = f"""
-            <section class="category-section" id="category-{category_name.lower()}">
-                <h2 class="category-title">🎯 {category_name} Focus</h2>
-                {"".join(category_html_cards)}
-            </section>
-            """
-            body_html_parts.append(section_html)
+            <div class="article-content">
+                {full_body}
+            </div>
+        </div>
+        """
+        cat = art_info["category"]
+        if cat not in category_grouped_html:
+            category_grouped_html[cat] = []
+        category_grouped_html[cat].append(card_html)
+
+    for cat_name, cards_list in category_grouped_html.items():
+        section_html = f"""
+        <section class="category-section" id="category-{cat_name.lower()}">
+            <h2 class="category-title">🎯 {cat_name} Focus</h2>
+            {"".join(cards_list)}
+        </section>
+        """
+        body_html_parts.append(section_html)
 
     if ref_html:
         body_html_parts.append(ref_html)
@@ -1397,11 +1490,19 @@ def parse_markdown_to_premium_html(md_path, today_str):
 def main():
     today_str = datetime.now().strftime("%Y-%m-%d")
     md_report_file = config.REPORTS_DIR / f"daily_brief_{today_str}.md"
-    html_report_file = config.REPORTS_DIR / f"daily_brief_{today_str}.html"
 
     if not md_report_file.exists():
-        logger.error(f"Markdown report file not found: {md_report_file}")
-        sys.exit(1)
+        # Fallback to the latest markdown briefing in REPORTS_DIR
+        md_files = sorted(list(config.REPORTS_DIR.glob("daily_brief_*.md")), reverse=True)
+        if md_files:
+            md_report_file = md_files[0]
+            today_str = md_report_file.stem.replace("daily_brief_", "")
+            logger.info(f"Today's brief not found. Falling back to latest brief: {md_report_file}")
+        else:
+            logger.error(f"No Markdown report files found in {config.REPORTS_DIR}")
+            sys.exit(1)
+
+    html_report_file = config.REPORTS_DIR / f"daily_brief_{today_str}.html"
 
     logger.info(f"Loading Markdown report from {md_report_file}...")
     try:

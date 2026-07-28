@@ -80,16 +80,23 @@ def generate_local_fallback_report(working_set, today_str):
     md.append("## Executive Summary\n")
     md.append(f"Today's feed collection yielded **{len(working_set)}** high-priority items. Here is a categorized breakdown of active security alerts, exploits, and technical updates.\n")
     
-    # Categorize items
+    # Track output articles to guarantee single post output
+    seen_ids = set()
     categorized = {tag: [] for tag in config.PENTEST_TAGS}
     uncategorized = []
     
     for art in working_set:
+        art_id = art.get("id", art["title"])
+        if art_id in seen_ids:
+            continue
+        seen_ids.add(art_id)
+
         placed = False
         for tag in art.get("tags", []):
             if tag in categorized:
                 categorized[tag].append(art)
                 placed = True
+                break  # Place in primary category only to prevent duplicate post cards
         if not placed:
             uncategorized.append(art)
 
@@ -100,10 +107,12 @@ def generate_local_fallback_report(working_set, today_str):
             continue
         md.append(f"## Category: {tag.upper()}\n")
         for art in items:
+            tags_str = ", ".join(art.get("tags", [tag]))
             md.append(f"### {art['title']}")
             md.append(f"- **Source**: {art['source']}")
             md.append(f"- **Priority Rank**: `{art.get('rank', 5)}/10`")
             md.append(f"- **Link**: [{art['link']}]({art['link']})")
+            md.append(f"- **Pentester Category Tags**: {tags_str}")
             md.append(f"- **Reasoning**: {art.get('rank_reason', 'N/A')}\n")
             
             if art.get('rank', 5) >= 7:
@@ -111,7 +120,7 @@ def generate_local_fallback_report(working_set, today_str):
                           "- *STRIDE Threat*: [Configure OPENROUTER_API_KEY to activate AI STRIDE threat classification]\n"
                           "- *Design Flaw*: [Configure OPENROUTER_API_KEY to map the underlying architectural design flaw]\n"
                           "- *Secure Design Principle*: [Configure OPENROUTER_API_KEY to specify the secure design defense principle]\n"
-                          "- *Secure Design Review Question*: [Configure OPENROUTER_API_KEY to generate a tailored design review question]\n")
+                          "- *Secure Design Review Question*: How does our system validate untrusted inputs before execution?\n")
                           
             readable_desc = format_readable_description(art['content_text'])
             md.append(f"**Description & Context**:\n\n{readable_desc}\n")
@@ -120,10 +129,12 @@ def generate_local_fallback_report(working_set, today_str):
     if uncategorized:
         md.append("## General Security Updates\n")
         for art in uncategorized:
+            tags_str = ", ".join(art.get("tags", ["news"]))
             md.append(f"### {art['title']}")
             md.append(f"- **Source**: {art['source']}")
             md.append(f"- **Priority Rank**: `{art.get('rank', 5)}/10`")
             md.append(f"- **Link**: [{art['link']}]({art['link']})")
+            md.append(f"- **Pentester Category Tags**: {tags_str}")
             
             readable_desc = format_readable_description(art['content_text'])
             md.append(f"**Description & Context**:\n\n{readable_desc}\n")
@@ -168,9 +179,9 @@ Structure of your output report:
 1. Title: "# Daily Security Intelligence Briefing - {today_str}"
 2. Executive Summary: A 1-paragraph summary highlighting the most critical threats/tactics observed today.
 3. Category Headings: Write headings for each of the matching tags: {config.PENTEST_TAGS} (only write categories that have articles). Note: Include top high-impact general security news stories (e.g. breach disclosures, APT campaign alerts, ransomware attacks) under Category: NEWS alongside technical zero-day vulnerabilities.
-4. Article Summaries: Under each category heading:
+4. Article Summaries: Under each category heading (place each unique article in EXACTLY ONE primary category section):
    - "### [Title]"
-   - Metadata bullet points: Source, Rank (X/10), Link, and Pentester Category tags.
+   - Metadata bullet points: Source, Rank (X/10), Link, and Pentester Category Tags (list all matching tags, e.g. web, api).
    - **Description & Context**: A short bulleted list (2-3 items maximum) summarizing what the vulnerability is, the affected software versions, and core triggering conditions. Avoid walls of text; keep it punchy and clear.
    - **TTPs & Exploitation Vectors**: A technical paragraph detailing how an attacker exploits this, what tools might be used, or the underlying mechanics.
    - **Pentesting Value & Testing Method**: A short paragraph advising a pentester how to identify, verify, or exploit this vulnerability in an assessment.
@@ -179,7 +190,7 @@ Structure of your output report:
      - *STRIDE Threat*: [e.g., Elevation of Privilege / Information Disclosure / Tampering]
      - *Design Flaw*: [State the architectural design-level root cause]
      - *Secure Design Principle*: [e.g., Least Privilege / Defense in Depth / Fail-Safe Defaults]
-     - *Secure Design Review Question*: [1 specific question for engineers/reviewers to ask during architecture design reviews to prevent this bug]
+     - *Secure Design Review Question*: [1-2 specific point-wise questions for engineers/reviewers to ask during architecture design reviews to prevent this bug]
    - **Dependency & Package Ecosystem Details**: (Only include this if the vulnerability is in a library, package, or third-party dependency. Otherwise, skip/omit it.)
      Write a short block containing:
      - *Package Name*: [e.g., `express`, `requests`, `spring-web`]
@@ -195,9 +206,11 @@ Structure of your output report:
 
 Keep the tone highly professional, precise, and practical for ethical hackers and product security engineers. 
 
-CRITICAL DEDUPLICATION RULES:
-1. If the articles list contains multiple posts covering the same vulnerability, threat event, or release (e.g. BleepingComputer and CISA both reporting on the same Fortinet FortiSandbox command injection CVEs, or multiple feeds covering the same SharePoint RCE), do NOT output duplicate entries. 
-2. Consolidate them: choose the single most authoritative or detailed article (preferring primary CISA alerts or Google Project Zero technical disclosures over news summaries) to create the summary card. Omit the redundant/duplicate news articles entirely to ensure the briefing has zero repetition.
+CRITICAL SINGLE-POST & DEDUPLICATION RULES:
+1. Output EXACTLY ONE summary post (card) per unique article/vulnerability. Do NOT output duplicate posts or repeat the same article under multiple category headings.
+2. If an article matches multiple pentest categories (e.g. both Web and API), place it under its primary category section and list ALL applicable tags in its metadata line (e.g. `- **Pentester Category Tags**: web, api`).
+3. If the input list contains multiple articles covering the exact same vulnerability or security event, consolidate them into a single authoritative post card and omit duplicate entries entirely.
+
 
 CRITICAL FORMATTING RULES:
 1. Do NOT prefix the bold section headers (like **Description & Context**, **TTPs & Exploitation Vectors**, **Pentesting Value & Testing Method**, **Threat Modeling & Secure Design Lesson**, and **Remediation**) with bullet points (like * or -). Write them on their own lines as plain text headers, e.g., '**TTPs & Exploitation Vectors**:'.
