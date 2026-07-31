@@ -183,8 +183,8 @@ Structure of your output report:
    - "### [Title]"
    - Metadata bullet points: Source, Rank (X/10), Link, and Pentester Category Tags (list all matching tags, e.g. web, api).
    - **Description & Context**: A short bulleted list (2-3 items maximum) summarizing what the vulnerability is, the affected software versions, and core triggering conditions. Avoid walls of text; keep it punchy and clear.
-   - **TTPs & Exploitation Vectors**: A technical paragraph detailing how an attacker exploits this, what tools might be used, or the underlying mechanics.
-   - **Pentesting Value & Testing Method**: A short paragraph advising a pentester how to identify, verify, or exploit this vulnerability in an assessment.
+   - **TTPs & Exploitation Vectors**: A short bulleted list (2-3 items maximum) detailing technical exploitation mechanics, tools used, or attack vectors.
+   - **Pentesting Value & Testing Method**: A short bulleted list (2-3 items maximum) advising a pentester step-by-step how to identify, verify, or exploit this vulnerability in an assessment.
    - **Threat Modeling & Secure Design Lesson**: (Only include this section for articles with a Priority Rank >= 7. Otherwise, skip/omit it.)
      Write a short block containing:
      - *STRIDE Threat*: [e.g., Elevation of Privilege / Information Disclosure / Tampering]
@@ -201,7 +201,7 @@ Structure of your output report:
      Write 2 to 3 actionable checkpoints for pull request reviewers:
      - `[ ]` [Specific code check or sanitization verification detail]
      - `[ ]` [Check configuration default or dependency update verification]
-   - **Remediation**: 1-2 sentences on how organizations should patch or mitigate the risk.
+   - **Remediation**: A short bulleted list or 1-2 sentences on how organizations should patch or mitigate the risk.
 5. End with a list of References (Titles and Links).
 
 Keep the tone highly professional, precise, and practical for ethical hackers and product security engineers. 

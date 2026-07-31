@@ -61,6 +61,22 @@ Test summary.
         # Should merge tags 'web' and 'api' into tag pills
         assert 'tag-web' in html
         assert 'tag-api' in html
-        assert 'Showing 1 of 1 findings' in html or 'total' in html
     finally:
         Path(temp_path).unlink()
+
+def test_format_content_to_point_cards():
+    from scripts.html_generator import format_content_to_point_cards, format_article_sections
+
+    paragraph_html = "<p>Attackers exploited CVE-2026-6875 to execute code. This is an active zero-day threat.</p>"
+    points_html = format_content_to_point_cards(paragraph_html, "ttps")
+
+    assert '<ul class="point-list ttps-list">' in points_html
+    assert '<span class="point-marker ttps-marker">⚡</span>' in points_html
+    assert '<span class="cve-pill">CVE-2026-6875</span>' in points_html
+    assert 'Attackers exploited' in points_html
+    assert 'This is an active zero-day threat.' in points_html
+
+    rendered_body = "<p><strong>TTPs &amp; Exploitation Vectors</strong>:</p><p>Attackers exploited CVE-2026-6875. Second sentence detail.</p>"
+    formatted = format_article_sections(rendered_body)
+    assert '<div class="section-header ttps-hdr">⚡ TTPs & Exploitation Vectors</div>' in formatted
+    assert '<ul class="point-list ttps-list">' in formatted

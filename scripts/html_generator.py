@@ -568,7 +568,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             cursor: not-allowed;
         }}
 
-        /* Article Content Section Headers */
+        /* Article Content Section Headers & Unified Point System */
         .article-content {{
             display: flex;
             flex-direction: column;
@@ -576,16 +576,122 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .section-header {{
-            font-size: 0.88rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.86rem;
             font-weight: 800;
-            color: var(--accent-primary);
             text-transform: uppercase;
-            margin-top: 0.9rem;
-            margin-bottom: 0.25rem;
             letter-spacing: 0.06em;
-            display: flex;
+            margin-top: 1.1rem;
+            margin-bottom: 0.5rem;
+            padding: 0.42rem 0.85rem;
+            border-radius: 9px;
+            display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.5rem;
+            width: fit-content;
+        }}
+
+        .section-header.desc-hdr {{
+            background: rgba(56, 189, 248, 0.09);
+            color: var(--accent-primary);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            border-left: 4px solid var(--accent-primary);
+        }}
+
+        .section-header.ttps-hdr {{
+            background: rgba(245, 158, 11, 0.09);
+            color: #fde047;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            border-left: 4px solid var(--accent-warning);
+        }}
+
+        .section-header.pentest-hdr {{
+            background: rgba(192, 132, 252, 0.09);
+            color: #e9d5ff;
+            border: 1px solid rgba(192, 132, 252, 0.25);
+            border-left: 4px solid var(--accent-purple);
+        }}
+
+        .section-header.remediation-hdr {{
+            background: rgba(16, 185, 129, 0.09);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            border-left: 4px solid var(--accent-success);
+        }}
+
+        /* Modern Point List Container & Cards */
+        .point-list {{
+            list-style: none !important;
+            padding: 0 !important;
+            margin: 0 0 0.8rem 0 !important;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }}
+
+        .point-item {{
+            display: flex;
+            align-items: flex-start;
+            gap: 0.65rem;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 0.7rem 0.95rem;
+            border-radius: 10px;
+            font-size: 0.94rem;
+            color: #cbd5e1;
+            line-height: 1.6;
+            transition: all 0.2s ease;
+        }}
+
+        .point-item:hover {{
+            background: rgba(15, 23, 42, 0.8);
+            border-color: rgba(255, 255, 255, 0.14);
+            transform: translateX(3px);
+        }}
+
+        .point-marker {{
+            flex-shrink: 0;
+            font-size: 0.9rem;
+            font-weight: 800;
+            line-height: 1.5;
+        }}
+
+        .point-marker.desc-marker {{ color: var(--accent-primary); }}
+        .point-marker.ttps-marker {{ color: var(--accent-warning); }}
+        .point-marker.pentest-marker {{ color: var(--accent-purple); }}
+        .point-marker.remediation-marker {{ color: var(--accent-success); }}
+
+        .point-text {{
+            color: #e2e8f0;
+            flex: 1;
+        }}
+
+        .point-text code {{
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #38bdf8;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }}
+
+        .point-text strong {{
+            color: #f8fafc;
+            font-weight: 700;
+        }}
+
+        .cve-pill {{
+            background: rgba(239, 68, 68, 0.16);
+            border: 1px solid rgba(239, 68, 68, 0.38);
+            color: #fca5a5;
+            padding: 0.1rem 0.45rem;
+            border-radius: 5px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            font-weight: 700;
+            display: inline-block;
+            margin: 0 0.15rem;
         }}
 
         .article-content p {{
@@ -595,17 +701,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }}
 
         .article-content ul {{
-            margin-left: 1.1rem;
+            margin-left: 0;
+            padding: 0;
             color: #cbd5e1;
             font-size: 0.95rem;
             display: flex;
             flex-direction: column;
-            gap: 0.35rem;
+            gap: 0.5rem;
+            list-style: none;
         }}
 
-        .article-content li {{
-            line-height: 1.6;
-        }}
 
         /* Sleek Threat Modeling Box */
         .threat-card-box {{
@@ -1196,6 +1301,107 @@ def format_dev_checklist_box(raw_checklist):
     """
     return box_html
 
+def format_content_to_point_cards(content_snippet, key_type):
+    """
+    Transform raw section HTML (whether markdown ul/li or paragraph <p>)
+    into structured point cards with themed bullet markers and CVE highlights.
+    """
+    if not content_snippet or not content_snippet.strip():
+        return ""
+
+    marker_info = {
+        "desc": ("desc-marker", "📌"),
+        "ttps": ("ttps-marker", "⚡"),
+        "pentest": ("pentest-marker", "🎯"),
+        "remediation": ("remediation-marker", "🔧")
+    }
+    marker_cls, default_icon = marker_info.get(key_type, ("desc-marker", "▸"))
+
+    items = []
+    
+    # 1. Check for <li> elements in content
+    li_matches = re.findall(r'<li>(.*?)</li>', content_snippet, re.DOTALL | re.IGNORECASE)
+    if li_matches:
+        for li in li_matches:
+            c = li.strip()
+            c = re.sub(r'</?p>', '', c).strip()
+            if c:
+                items.append(c)
+    else:
+        # 2. Extract paragraph text or split by sentences
+        p_matches = re.findall(r'<p>(.*?)</p>', content_snippet, re.DOTALL | re.IGNORECASE)
+        raw_text = " ".join(p_matches) if p_matches else content_snippet
+        clean_text = re.sub(r'</?(?!strong|b|code|em|i)[^>]+>', '', raw_text).strip()
+        
+        # Split sentences cleanly without breaking CVE-xxxx or decimals
+        sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z0-9"])', clean_text)
+        for s in sentences:
+            s_clean = s.strip()
+            if len(s_clean) > 8:
+                items.append(s_clean)
+
+    if not items:
+        clean_fallback = re.sub(r'</?(?!strong|b|code|em|i)[^>]+>', '', content_snippet).strip()
+        items = [clean_fallback] if clean_fallback else [content_snippet.strip()]
+
+    point_lis = []
+    for item in items:
+        # Auto-highlight CVEs with styled badge pill if present
+        item_formatted = re.sub(
+            r'\b(CVE-\d{4}-\d{4,7})\b',
+            r'<span class="cve-pill">\1</span>',
+            item
+        )
+        point_lis.append(
+            f'<li class="point-item">'
+            f'<span class="point-marker {marker_cls}">{default_icon}</span>'
+            f'<span class="point-text">{item_formatted}</span>'
+            f'</li>'
+        )
+
+    return f'<ul class="point-list {key_type}-list">{"".join(point_lis)}</ul>'
+
+
+def format_article_sections(rendered_body):
+    """
+    Parse all standard markdown headers in article body and format them into
+    consistent, theme-accented point cards.
+    """
+    sections = [
+        ("Description &amp; Context", "📌 Description & Context", "desc", "desc-hdr"),
+        ("Description & Context", "📌 Description & Context", "desc", "desc-hdr"),
+        ("TTPs &amp; Exploitation Vectors", "⚡ TTPs & Exploitation Vectors", "ttps", "ttps-hdr"),
+        ("TTPs & Exploitation Vectors", "⚡ TTPs & Exploitation Vectors", "ttps", "ttps-hdr"),
+        ("Pentesting Value &amp; Testing Method", "🎯 Pentesting Value & Testing Method", "pentest", "pentest-hdr"),
+        ("Pentesting Value & Testing Method", "🎯 Pentesting Value & Testing Method", "pentest", "pentest-hdr"),
+        ("Remediation &amp; Mitigations", "🔧 Remediation & Mitigations", "remediation", "remediation-hdr"),
+        ("Remediation", "🔧 Remediation & Mitigations", "remediation", "remediation-hdr"),
+    ]
+
+    for key, display_title, key_type, hdr_cls in sections:
+        # Pattern 1: Header alone in <p><strong>Key</strong>:</p> followed by HTML content snippet
+        pattern1 = r'<p><strong>' + re.escape(key) + r'</strong>(?::|\s)*</p>\s*(.*?)(?=<p><strong>|<div class="section-header">|<div class="threat-card-box">|<div class="ecosystem-card-box">|<div class="dev-checklist-box">|$)'
+        
+        def repl1(m):
+            snippet = m.group(1).strip()
+            points_html = format_content_to_point_cards(snippet, key_type)
+            return f'<div class="section-header {hdr_cls}">{display_title}</div>{points_html}'
+
+        new_body, count = re.subn(pattern1, repl1, rendered_body, flags=re.IGNORECASE | re.DOTALL)
+        if count > 0:
+            rendered_body = new_body
+        else:
+            # Pattern 2: Header inline inside <p><strong>Key</strong>: Content...</p>
+            pattern2 = r'<p><strong>' + re.escape(key) + r'</strong>(?::|\s)*\s*(.*?)</p>'
+            def repl2(m):
+                snippet = m.group(1).strip()
+                points_html = format_content_to_point_cards(snippet, key_type)
+                return f'<div class="section-header {hdr_cls}">{display_title}</div>{points_html}'
+            
+            rendered_body = re.sub(pattern2, repl2, rendered_body, flags=re.IGNORECASE | re.DOTALL)
+
+    return rendered_body
+
 def parse_markdown_to_premium_html(md_path, today_str):
     with open(md_path, "r", encoding="utf-8") as f:
         md_content = f.read()
@@ -1355,31 +1561,7 @@ def parse_markdown_to_premium_html(md_path, today_str):
                     cleaned_art_body = cleaned_art_body.replace(checklist_block_match.group(0), "")
 
             rendered_body = markdown.markdown(cleaned_art_body)
-            
-            headers_to_style = {
-                "Description &amp; Context": ("📌 Description & Context", ""),
-                "TTPs &amp; Exploitation Vectors": ("⚡ TTPs & Exploitation Vectors", ""),
-                "Pentesting Value &amp; Testing Method": ("🎯 Pentesting Value & Testing Method", ""),
-                "Threat Modeling &amp; Secure Design Lesson": ("🛡️ Threat Modeling & Secure Design Lesson", "purple-hdr"),
-                "Dependency &amp; Package Ecosystem Details": ("📦 Dependency & Package Ecosystem Details", ""),
-                "Developer PR Review Checklist": ("📋 Developer PR Review Checklist", ""),
-                "Remediation": ("🔧 Remediation & Mitigations", "")
-            }
-            
-            for key, (val, extra_cls) in headers_to_style.items():
-                cls_attr = f' class="section-header {extra_cls}"' if extra_cls else ' class="section-header"'
-                rendered_body = re.sub(
-                    r'<p><strong>' + key + r'</strong>(?::|\s)*\s*([^:\s].*?)</p>',
-                    r'<div' + cls_attr + r'>' + val + r'</div><p>\1</p>',
-                    rendered_body,
-                    flags=re.IGNORECASE
-                )
-                rendered_body = re.sub(
-                    r'<p><strong>' + key + r'</strong>(?::|\s)*\s*</p>',
-                    r'<div' + cls_attr + r'>' + val + r'</div>',
-                    rendered_body,
-                    flags=re.IGNORECASE
-                )
+            rendered_body = format_article_sections(rendered_body)
 
             # FALLBACK POST-MARKDOWN CHECK: If Threat Modeling wasn't caught pre-markdown, catch it post-markdown!
             if not threat_box_html:
