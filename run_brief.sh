@@ -29,10 +29,12 @@ fi
 
 log_step "Activating virtual environment..."
 source venv/bin/activate
+export PYTHONPATH="$PROJECT_DIR"
 
 log_step "Installing/updating dependencies from requirements.txt..."
 pip install --upgrade pip >> "$LOG_FILE" 2>&1
 pip install -r requirements.txt >> "$LOG_FILE" 2>&1
+pip install -e . >> "$LOG_FILE" 2>&1
 
 # 2. Clear previous cache to ensure fresh data
 log_step "Clearing previous cache for a fresh fetch..."
