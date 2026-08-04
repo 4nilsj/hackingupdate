@@ -1,6 +1,8 @@
 import sys
 import json
+import warnings
 import requests
+import urllib3
 import feedparser
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -12,9 +14,6 @@ from hackingupdate.config import (
 import hackingupdate.config as config
 
 logger = config.get_logger("fetcher")
-
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Maximum number of concurrent feed fetch workers
 MAX_WORKERS: int = 8
@@ -38,21 +37,24 @@ def fetch_feed(url: str) -> tuple[str, "feedparser.FeedParserDict | None"]:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
     except requests.exceptions.SSLError as ssl_err:
-        logger.warning(f"SSL certificate verification failed for {url}, retrying without SSL verification...")
+        # Only a genuine TLS/certificate failure warrants an insecure retry.
+        # Other errors (timeouts, DNS, 4xx/5xx) fall straight through to the
+        # feedparser fallback below rather than silently disabling verification.
+        logger.warning(
+            f"SSL certificate verification failed for {url} ({ssl_err}); "
+            "retrying once with verification disabled. This request is not MITM-safe."
+        )
         try:
-            response = requests.get(url, headers=headers, timeout=15, verify=False)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
+                response = requests.get(url, headers=headers, timeout=15, verify=False)
             response.raise_for_status()
         except Exception as e_unverified:
             logger.error(f"Unverified SSL fetch failed for {url}: {e_unverified}")
+            response = None
     except Exception as e:
         logger.warning(f"Initial HTTP fetch failed for {url}: {e}")
-        # Try with verify=False if it was a connection or cert error
-        try:
-            response = requests.get(url, headers=headers, timeout=15, verify=False)
-            if response.status_code == 200:
-                logger.info(f"Unverified SSL fetch succeeded for {url}")
-        except Exception:
-            pass
+        response = None
 
     if response and response.status_code == 200:
         try:

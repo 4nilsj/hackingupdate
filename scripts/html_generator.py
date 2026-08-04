@@ -1,7 +1,9 @@
 import sys
 import re
 from datetime import datetime
+from html import escape as html_escape
 from pathlib import Path
+import bleach
 import markdown
 
 from hackingupdate.config import get_logger, REPORTS_DIR, WORKING_CACHE_FILE
@@ -9,6 +11,51 @@ from hackingupdate.config import get_logger, REPORTS_DIR, WORKING_CACHE_FILE
 import hackingupdate.config as config
 
 logger = config.get_logger("html_generator")
+
+# Article content originates from public RSS feeds and LLM output -- both
+# untrusted -- so everything derived from it is sanitized before being
+# embedded in the generated report.
+_ALLOWED_TAGS = [
+    "p", "br", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li",
+    "h1", "h2", "h3", "h4", "blockquote", "code", "pre", "a", "span",
+    "div", "table", "thead", "tbody", "tr", "th", "td", "hr",
+]
+_ALLOWED_ATTRS = {
+    "a": ["href", "title", "target", "rel"],
+    "span": ["class"],
+    "div": ["class"],
+    "code": ["class"],
+    "th": ["colspan", "rowspan"],
+    "td": ["colspan", "rowspan"],
+}
+_ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
+
+
+def _sanitize_html(raw_html: str) -> str:
+    """Strip any tag/attribute/protocol not on the allowlist."""
+    if not raw_html:
+        return raw_html
+    return bleach.clean(
+        raw_html,
+        tags=_ALLOWED_TAGS,
+        attributes=_ALLOWED_ATTRS,
+        protocols=_ALLOWED_PROTOCOLS,
+        strip=True,
+    )
+
+
+def _safe_link(url: str) -> str:
+    """Only allow http(s) links; anything else (javascript:, data:, etc.) becomes '#'."""
+    url = (url or "").strip()
+    if re.match(r'^https?://', url, re.IGNORECASE):
+        return html_escape(url, quote=True)
+    return "#"
+
+
+def _safe_slug(text: str) -> str:
+    """Collapse to a safe id/class token: lowercase alnum + hyphen only."""
+    slug = re.sub(r'[^a-z0-9]+', '-', (text or "").lower()).strip('-')
+    return slug or "misc"
 
 # Ultra-clean, modern Cyberpunk / Security Dark Theme HTML Template
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -1417,7 +1464,7 @@ def parse_markdown_to_premium_html(md_path, today_str):
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-purple);"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 Executive Intelligence Summary
             </h2>
-            <p>{summary_text}</p>
+            <p>{html_escape(summary_text)}</p>
         </div>
         """
         md_content = md_content.replace(exec_summary_match.group(0), "")
@@ -1436,11 +1483,11 @@ def parse_markdown_to_premium_html(md_path, today_str):
             link_match = re.search(r'\[(.*?)\]\((.*?)\)', line)
             if link_match:
                 title, url = link_match.groups()
-                ref_items.append(f'<li><a href="{url}" target="_blank">🔗 {title}</a></li>')
+                ref_items.append(f'<li><a href="{_safe_link(url)}" target="_blank">🔗 {html_escape(title)}</a></li>')
             elif line.startswith("-") or line.startswith("*"):
-                ref_items.append(f'<li>{line[1:].strip()}</li>')
+                ref_items.append(f'<li>{html_escape(line[1:].strip())}</li>')
             else:
-                ref_items.append(f'<li>{line}</li>')
+                ref_items.append(f'<li>{html_escape(line)}</li>')
         
         ref_html = f"""
         <div class="references">
@@ -1572,18 +1619,19 @@ def parse_markdown_to_premium_html(md_path, today_str):
                     if threat_box_html:
                         rendered_body = rendered_body.replace(post_threat_match.group(0), "")
 
-            # Store unique article details
+            # Store unique article details (sanitized -- everything above comes from
+            # untrusted RSS feed / LLM output)
             seen_articles[norm_key] = {
-                "title": art_title,
-                "source": source,
+                "title": html_escape(art_title),
+                "source": html_escape(source),
                 "rank_num": rank_num,
-                "link": link,
+                "link": _safe_link(link),
                 "tags": tags,
                 "category": category_name,
-                "rendered_body": rendered_body,
-                "threat_box_html": threat_box_html,
-                "eco_box_html": eco_box_html,
-                "checklist_box_html": checklist_box_html
+                "rendered_body": _sanitize_html(rendered_body),
+                "threat_box_html": _sanitize_html(threat_box_html),
+                "eco_box_html": _sanitize_html(eco_box_html),
+                "checklist_box_html": _sanitize_html(checklist_box_html)
             }
             article_keys_order.append(norm_key)
 
@@ -1599,7 +1647,7 @@ def parse_markdown_to_premium_html(md_path, today_str):
         elif rank_num >= 6:
             high_count += 1
 
-        tags_html = "".join([f'<span class="tag-pill tag-{t}">{t}</span>' for t in art_info["tags"]])
+        tags_html = "".join([f'<span class="tag-pill tag-{_safe_slug(t)}">{html_escape(t)}</span>' for t in art_info["tags"]])
         
         if rank_num >= 8:
             rank_class = "rank-critical"
@@ -1644,8 +1692,8 @@ def parse_markdown_to_premium_html(md_path, today_str):
 
     for cat_name, cards_list in category_grouped_html.items():
         section_html = f"""
-        <section class="category-section" id="category-{cat_name.lower()}">
-            <h2 class="category-title">🎯 {cat_name} Focus</h2>
+        <section class="category-section" id="category-{_safe_slug(cat_name)}">
+            <h2 class="category-title">🎯 {html_escape(cat_name)} Focus</h2>
             {"".join(cards_list)}
         </section>
         """
@@ -1658,7 +1706,7 @@ def parse_markdown_to_premium_html(md_path, today_str):
     
     if len(body_html_parts) <= 1:
         logger.info("Direct markdown conversion (no categories found).")
-        direct_html = markdown.markdown(md_content)
+        direct_html = _sanitize_html(markdown.markdown(md_content))
         complete_body_html = (exec_summary_html if exec_summary_html else "") + f'<div style="background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 18px; padding: 2rem;">{direct_html}</div>' + (ref_html if ref_html else "")
 
     return HTML_TEMPLATE.format(

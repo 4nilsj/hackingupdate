@@ -1,11 +1,14 @@
 """Unit tests for html_generator.py verifying point-wise design review box and single post card deduplication."""
 
+import re
 import tempfile
 from pathlib import Path
+
 from scripts.html_generator import (
     format_threat_modeling_box,
     parse_markdown_to_premium_html,
 )
+
 
 def test_format_threat_modeling_box_point_wise():
     raw_threat = """
@@ -64,8 +67,55 @@ Test summary.
     finally:
         Path(temp_path).unlink()
 
+def test_parse_markdown_to_premium_html_sanitizes_malicious_article():
+    """Article title, link, source, and body come from untrusted RSS/LLM content;
+    a malicious payload in any of them must not survive into the rendered HTML."""
+    md_content = """# Daily Security Intelligence Briefing - 2026-07-29
+
+## Executive Summary
+Test summary.
+
+## Category: WEB
+### <img src=x onerror=alert(1)>Fake Advisory
+- **Source**: <script>alert('src')</script>Evil Corp
+- **Priority Rank**: `9/10`
+- **Link**: javascript:alert(document.cookie)
+- **Pentester Category Tags**: web
+
+**Description & Context**:
+- Normal text <script>alert('body')</script> more text.
+
+---
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
+        f.write(md_content)
+        temp_path = f.name
+
+    try:
+        html = parse_markdown_to_premium_html(temp_path, "2026-07-29")
+
+        # Isolate the injected article card from the page's own trusted
+        # template chrome (which legitimately has a <script> and onclick=
+        # handlers for the search/filter UI) before asserting on it.
+        card_start = html.index('<div class="article-card')
+        card_end = html.index('</section>', card_start)
+        card_html = html[card_start:card_end]
+
+        # bleach/html.escape neutralize markup by stripping tags or turning
+        # them into inert escaped text (e.g. "&lt;img ...&gt;"), so the raw
+        # substrings ("alert(1)", "onerror=", "javascript:") may still appear
+        # as harmless text. What actually matters is that no *live* markup
+        # construct survives within the injected content: no real <script>
+        # tag, no element carrying an event handler, no javascript: URI.
+        assert not re.search(r"<script[^>]*>\s*alert", card_html, re.IGNORECASE)
+        assert not re.search(r"<[a-z]+[^>]*\son\w+\s*=", card_html, re.IGNORECASE)
+        assert not re.search(r'href\s*=\s*"javascript:', card_html, re.IGNORECASE)
+        assert 'href="#"' in card_html  # unsafe link neutralized
+    finally:
+        Path(temp_path).unlink()
+
 def test_format_content_to_point_cards():
-    from scripts.html_generator import format_content_to_point_cards, format_article_sections
+    from scripts.html_generator import format_article_sections, format_content_to_point_cards
 
     paragraph_html = "<p>Attackers exploited CVE-2026-6875 to execute code. This is an active zero-day threat.</p>"
     points_html = format_content_to_point_cards(paragraph_html, "ttps")
