@@ -4,10 +4,8 @@ import re
 import tempfile
 from pathlib import Path
 
-from scripts.html_generator import (
-    format_threat_modeling_box,
-    parse_markdown_to_premium_html,
-)
+from scripts.html_generator import parse_markdown_to_premium_html
+from scripts.report_formatting import format_threat_modeling_box
 
 
 def test_format_threat_modeling_box_point_wise():
@@ -22,6 +20,76 @@ def test_format_threat_modeling_box_point_wise():
     assert '<span class="review-bullet">✦</span>' in html
     assert 'How does our application validate untrusted input?' in html
     assert 'What sanitization is applied before query execution?' in html
+
+def test_format_threat_modeling_box_strips_inline_markdown_html():
+    """Markdown-rendered inline formatting (e.g. <em>/<strong> from italic/bold
+    source text) must not break field extraction -- regression for the inline
+    italic handling fixed in 0439614."""
+    raw_threat = """
+    <p><strong>STRIDE Threat</strong>: <em>Elevation of Privilege</em></p>
+    <p><strong>Design Flaw</strong>: Missing <em>authorization</em> check on admin routes</p>
+    <p><strong>Secure Design Principle</strong>: Fail Securely</p>
+    <p><strong>Secure Design Review Question</strong>: Does every admin route re-check the caller's role server-side?</p>
+    """
+    html = format_threat_modeling_box(raw_threat)
+    assert "Elevation of Privilege" in html
+    assert "Missing" in html and "authorization" in html
+    assert "Fail Securely" in html
+    assert "Does every admin route re-check the caller" in html
+    # No raw <em>/<strong> tags should leak into the extracted field values
+    assert "<em>" not in html
+    assert "<strong>" not in html
+
+def test_format_threat_modeling_box_single_line_paragraph_fallback():
+    """When the LLM output doesn't use the four labeled fields at all (just a
+    single freeform paragraph), the box must still render something instead
+    of silently disappearing -- regression for the section-disappearance bug
+    fixed in ebdfb5d via the safe non-destructive fallback."""
+    raw_threat = (
+        "This endpoint trusts a client-supplied role header instead of "
+        "re-checking authorization server-side, which lets any authenticated "
+        "user escalate to admin."
+    )
+    html = format_threat_modeling_box(raw_threat)
+    assert html.strip()
+    assert '<ul class="design-review-list">' in html
+    assert "trusts a client-supplied role header" in html
+    assert "🛡️ Threat Modeling & Secure Design Lesson" in html
+
+def test_parse_markdown_to_premium_html_renders_threat_box_for_malformed_article():
+    """End-to-end: an article whose Threat Modeling text has no recognizable
+    field labels must still produce a rendered threat-card-box in the final
+    HTML, not lose the section entirely."""
+    md_content = """# Daily Security Intelligence Briefing - 2026-07-29
+
+## Executive Summary
+Test summary.
+
+## Category: WEB
+### Broken Access Control in Admin Panel
+- **Source**: SecurityWeek
+- **Priority Rank**: `8/10`
+- **Link**: https://example.com/admin-bac
+- **Pentester Category Tags**: web
+
+**Description & Context**:
+- Admin panel does not verify role server-side.
+
+**Threat Modeling & Secure Design Lesson**:
+Trusting a client-supplied role header instead of re-checking authorization server-side.
+
+---
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
+        f.write(md_content)
+        temp_path = f.name
+
+    try:
+        html = parse_markdown_to_premium_html(temp_path, "2026-07-29")
+        assert "threat-card-box" in html
+        assert "Trusting a client-supplied role header" in html
+    finally:
+        Path(temp_path).unlink()
 
 def test_parse_markdown_to_premium_html_deduplication():
     md_content = """# Daily Security Intelligence Briefing - 2026-07-29
@@ -115,7 +183,7 @@ Test summary.
         Path(temp_path).unlink()
 
 def test_format_content_to_point_cards():
-    from scripts.html_generator import format_article_sections, format_content_to_point_cards
+    from scripts.report_formatting import format_article_sections, format_content_to_point_cards
 
     paragraph_html = "<p>Attackers exploited CVE-2026-6875 to execute code. This is an active zero-day threat.</p>"
     points_html = format_content_to_point_cards(paragraph_html, "ttps")
