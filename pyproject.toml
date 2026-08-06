@@ -60,3 +60,16 @@ include = ["hackingupdate*"]
 [tool.ruff]
 target-version = "py310"
 line-length = 120
+
+[tool.coverage.run]
+source = ["hackingupdate", "scripts"]
+
+[tool.coverage.report]
+# Ratchet this up as coverage improves; it exists to catch regressions,
+# not to demand a coverage level the test suite hasn't earned yet.
+fail_under = 30
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
