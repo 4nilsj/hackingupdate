@@ -11,10 +11,7 @@ Provides persistent storage of daily security findings with:
 import sys
 import json
 import sqlite3
-from datetime import datetime, date
-from pathlib import Path
-
-from hackingupdate.config import get_logger, DB_PATH as _CONFIG_DB_PATH
+from datetime import date
 
 import hackingupdate.config as config
 
@@ -269,7 +266,7 @@ def main():
         sys.exit(1)
 
     # Store findings
-    result = store_findings(articles)
+    store_findings(articles)
 
     # Print summary
     stats = get_stats()

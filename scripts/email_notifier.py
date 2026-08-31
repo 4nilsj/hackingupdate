@@ -9,7 +9,6 @@ Configuration via environment variables:
   SMTP_FROM_EMAIL, SMTP_TO_EMAILS (comma-separated), SMTP_USE_TLS
 """
 
-import sys
 import json
 import re
 import smtplib
@@ -24,7 +23,6 @@ from hackingupdate.config import (
     WORKING_CACHE_FILE, RANKED_CACHE_FILE, REPORTS_DIR,
 )
 
-import hackingupdate.config as config
 
 logger = get_logger("email_notifier")
 

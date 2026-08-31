@@ -3,11 +3,6 @@ import json
 import re
 import requests
 from datetime import datetime
-from pathlib import Path
-
-from hackingupdate.config import (
-    get_logger, TEAMS_WEBHOOK_URL, REPORTS_DIR, WORKING_CACHE_FILE,
-)
 
 import hackingupdate.config as config
 

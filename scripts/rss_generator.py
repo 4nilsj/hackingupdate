@@ -11,9 +11,6 @@ import json
 import html
 from datetime import datetime, timezone
 from email.utils import format_datetime
-from pathlib import Path
-
-from hackingupdate.config import get_logger, WORKING_CACHE_FILE, REPORTS_DIR
 
 import hackingupdate.config as config
 
