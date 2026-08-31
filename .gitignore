@@ -32,5 +32,11 @@ build/
 *.egg-info/
 *.egg
 
+# Test coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
 # Reports (generated output, not source)
 reports/

@@ -1,15 +1,8 @@
 import sys
 import json
-import warnings
 import requests
-import urllib3
 import feedparser
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
-from hackingupdate.config import (
-    get_logger, FEEDS_FILE, RAW_CACHE_FILE,
-)
 
 import hackingupdate.config as config
 
@@ -37,21 +30,11 @@ def fetch_feed(url: str) -> tuple[str, "feedparser.FeedParserDict | None"]:
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
     except requests.exceptions.SSLError as ssl_err:
-        # Only a genuine TLS/certificate failure warrants an insecure retry.
-        # Other errors (timeouts, DNS, 4xx/5xx) fall straight through to the
-        # feedparser fallback below rather than silently disabling verification.
-        logger.warning(
-            f"SSL certificate verification failed for {url} ({ssl_err}); "
-            "retrying once with verification disabled. This request is not MITM-safe."
-        )
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
-                response = requests.get(url, headers=headers, timeout=15, verify=False)
-            response.raise_for_status()
-        except Exception as e_unverified:
-            logger.error(f"Unverified SSL fetch failed for {url}: {e_unverified}")
-            response = None
+        # Never retry with verification disabled — that would accept a MITM'd
+        # response and feed attacker-controlled content into the ranker/report.
+        # Fall straight through to the feedparser fallback below instead.
+        logger.warning(f"SSL certificate verification failed for {url}: {ssl_err}")
+        response = None
     except Exception as e:
         logger.warning(f"Initial HTTP fetch failed for {url}: {e}")
         response = None

@@ -2,15 +2,9 @@ import sys
 import json
 import requests
 from datetime import datetime
-from pathlib import Path
 import re
 
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-
-from hackingupdate.config import (
-    get_logger, OPENROUTER_API_KEY, OPENROUTER_MODEL, PENTEST_TAGS,
-    WORKING_CACHE_FILE, REPORTS_DIR,
-)
 
 import hackingupdate.config as config
 

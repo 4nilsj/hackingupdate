@@ -1,10 +1,5 @@
 import sys
 import json
-from pathlib import Path
-
-from hackingupdate.config import (
-    get_logger, RANKED_CACHE_FILE, FINGERPRINT_CACHE_FILE, WORKING_CACHE_FILE,
-)
 
 import hackingupdate.config as config
 

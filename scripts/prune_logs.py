@@ -1,9 +1,5 @@
-import sys
 import re
 from datetime import datetime, timedelta
-from pathlib import Path
-
-from hackingupdate.config import get_logger, LOG_FILE
 
 import hackingupdate.config as config
 

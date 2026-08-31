@@ -1,13 +1,11 @@
 import sys
 import json
 import re
-from pathlib import Path
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
-import time
 
 from hackingupdate.config import (
-    get_logger, RAW_CACHE_FILE, FULL_CACHE_FILE, ARTICLE_MAX_AGE_DAYS,
+    ARTICLE_MAX_AGE_DAYS,
 )
 
 import hackingupdate.config as config

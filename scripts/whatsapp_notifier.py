@@ -1,15 +1,7 @@
-import sys
 import json
 import re
 import requests
 from datetime import datetime
-from pathlib import Path
-
-from hackingupdate.config import (
-    get_logger, WORKING_CACHE_FILE, RANKED_CACHE_FILE, REPORTS_DIR,
-    TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, TWILIO_TO_NUMBER,
-    WHATSAPP_API_URL, WHATSAPP_TOKEN, WHATSAPP_RECIPIENT,
-)
 
 import hackingupdate.config as config
 
