@@ -2,14 +2,8 @@ import sys
 import json
 import time
 import requests
-from pathlib import Path
 
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-
-from hackingupdate.config import (
-    get_logger, OPENROUTER_API_KEY, OPENROUTER_MODEL, PENTEST_TAGS,
-    DEDUPED_CACHE_FILE, RANKED_CACHE_FILE, LLM_BATCH_DELAY,
-)
 
 import hackingupdate.config as config
 
@@ -175,29 +169,60 @@ You MUST return ONLY a valid JSON object in the following format (do not wrap in
         # Parse JSON
         results = json.loads(content_str)
         rankings = results.get("rankings", [])
-        
+
         # Build dictionary by ID for quick mapping
         rankings_map = {r["id"]: r for r in rankings if "id" in r}
-        
+
         final_batch = []
         for art in batch:
             art_id = art["id"]
             if art_id in rankings_map:
+                raw = rankings_map[art_id]
                 final_batch.append({
                     "id": art_id,
-                    "rank": int(rankings_map[art_id].get("rank", 5)),
-                    "tags": rankings_map[art_id].get("tags", ["network"]),
-                    "reason": rankings_map[art_id].get("reason", "Ranked by LLM.")
+                    "rank": _sanitize_llm_rank(raw.get("rank")),
+                    "tags": _sanitize_llm_tags(raw.get("tags")),
+                    "reason": _sanitize_llm_reason(raw.get("reason")),
                 })
             else:
                 logger.warning(f"LLM missed ranking for article ID: {art_id}. Using fallback.")
                 final_batch.append(fallback_rank_and_tag(art))
-                
+
         return final_batch
 
     except Exception as e:
         logger.error(f"OpenRouter API call failed after retries: {e}. Falling back to keyword ranking.")
         return [fallback_rank_and_tag(art) for art in batch]
+
+
+def _sanitize_llm_rank(raw_rank) -> int:
+    """Clamp the LLM's claimed rank into the valid 1-10 range.
+
+    Article content is untrusted (it comes from external RSS feeds) and is fed
+    directly into the LLM prompt, so a malicious or hallucinated response must
+    never be trusted as-is here.
+    """
+    try:
+        rank = int(raw_rank)
+    except (TypeError, ValueError):
+        return 5
+    return max(1, min(rank, 10))
+
+
+def _sanitize_llm_tags(raw_tags) -> list[str]:
+    """Restrict tags to the known PENTEST_TAGS whitelist, ignoring anything else
+    the LLM may have been steered into returning by injected feed content."""
+    if not isinstance(raw_tags, list):
+        return ["network"]
+    valid_tags = [t for t in raw_tags if isinstance(t, str) and t in config.PENTEST_TAGS]
+    return valid_tags or ["network"]
+
+
+def _sanitize_llm_reason(raw_reason) -> str:
+    """Coerce the reason to a string and cap its length as defense-in-depth
+    against an oversized or malformed value from the LLM response."""
+    reason = raw_reason if isinstance(raw_reason, str) else "Ranked by LLM."
+    return reason[:500]
 
 
 @retry(
