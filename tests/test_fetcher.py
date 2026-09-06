@@ -30,25 +30,19 @@ def test_fetch_feed_success():
         assert feed.entries[0].title == "Test Security Advisory"
 
 
-def test_fetch_feed_ssl_error_retries_insecurely():
-    """A genuine TLS/cert failure is allowed one verify=False retry."""
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.content = b"""<?xml version="1.0"?>
-    <rss version="2.0"><channel><title>Test Feed</title>
-      <item><title>A</title><link>https://example.com/1</link></item>
-    </channel></rss>"""
-    mock_resp.raise_for_status.return_value = None
-
+def test_fetch_feed_ssl_error_never_retries_insecurely():
+    """A TLS/cert failure must never be retried with verification disabled — it should
+    fall through to the feedparser fallback instead of risking a MITM'd response."""
     with patch(
         "requests.get",
-        side_effect=[requests.exceptions.SSLError("cert verify failed"), mock_resp],
-    ) as mock_get:
-        _url, feed = fetch_feed("https://example.com/rss.xml")
-        assert feed is not None
-        assert mock_get.call_count == 2
-        # second call is the insecure retry
-        assert mock_get.call_args_list[1].kwargs["verify"] is False
+        side_effect=requests.exceptions.SSLError("cert verify failed"),
+    ) as mock_get, patch("feedparser.parse", return_value=MagicMock(entries=[])) as mock_parse:
+        fetch_feed("https://example.com/rss.xml")
+        assert mock_get.call_count == 1
+        for call in mock_get.call_args_list:
+            assert call.kwargs.get("verify", True) is not False
+        # falls back to feedparser parsing the URL directly
+        mock_parse.assert_called_once_with("https://example.com/rss.xml")
 
 
 def test_fetch_feed_non_ssl_error_does_not_retry_insecurely():

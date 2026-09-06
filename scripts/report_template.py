@@ -1,6 +1,6 @@
 """
-Backward-compatibility alias for teams_notifier.
-Core implementation has moved to `hackingupdate.teams_notifier`.
+Backward-compatibility alias for report_template.
+Core implementation has moved to `hackingupdate.report_template`.
 """
 
 import sys
@@ -10,7 +10,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import hackingupdate.teams_notifier as _real_module
+import hackingupdate.report_template as _real_module
 
 sys.modules[__name__] = _real_module
 
