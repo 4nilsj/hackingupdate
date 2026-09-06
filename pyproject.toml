@@ -55,11 +55,16 @@ Homepage = "https://github.com/4nilsj/hackingupdate"
 Repository = "https://github.com/4nilsj/hackingupdate"
 
 [tool.setuptools.packages.find]
-include = ["hackingupdate*"]
+include = ["hackingupdate*", "scripts*"]
 
 [tool.ruff]
 target-version = "py310"
 line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+per-file-ignores = { "scripts/*" = ["E402"] }
 
 [tool.coverage.run]
 source = ["hackingupdate", "scripts"]

@@ -55,7 +55,8 @@ def test_load_working_set_falls_back_to_db(tmp_path, monkeypatch):
 
     fake_db_manager = MagicMock()
     fake_db_manager.get_findings_by_date.return_value = [{"title": "From DB"}]
-    with patch.dict("sys.modules", {"scripts.db_manager": fake_db_manager}):
+    patch_mods = {"hackingupdate.db_manager": fake_db_manager, "scripts.db_manager": fake_db_manager}
+    with patch.dict("sys.modules", patch_mods):
         result = whatsapp_notifier.load_working_set_with_fallback("2026-08-30")
 
     assert result == [{"title": "From DB"}]
@@ -67,7 +68,8 @@ def test_load_working_set_returns_empty_when_nothing_available(tmp_path, monkeyp
 
     fake_db_manager = MagicMock()
     fake_db_manager.get_findings_by_date.return_value = []
-    with patch.dict("sys.modules", {"scripts.db_manager": fake_db_manager}):
+    patch_mods = {"hackingupdate.db_manager": fake_db_manager, "scripts.db_manager": fake_db_manager}
+    with patch.dict("sys.modules", patch_mods):
         result = whatsapp_notifier.load_working_set_with_fallback("2026-08-30")
 
     assert result == []
@@ -192,7 +194,8 @@ def test_main_uses_twilio_when_configured(tmp_path, monkeypatch):
     fake_db_manager = MagicMock()
     fake_db_manager.get_findings_by_date.return_value = []
 
-    with patch.dict("sys.modules", {"scripts.db_manager": fake_db_manager}), \
+    patch_mods = {"hackingupdate.db_manager": fake_db_manager, "scripts.db_manager": fake_db_manager}
+    with patch.dict("sys.modules", patch_mods), \
          patch.object(whatsapp_notifier, "send_twilio_notification", return_value=True) as mock_send:
         whatsapp_notifier.main()
 
@@ -213,7 +216,8 @@ def test_main_skips_when_nothing_configured(tmp_path, monkeypatch):
     fake_db_manager = MagicMock()
     fake_db_manager.get_findings_by_date.return_value = []
 
-    with patch.dict("sys.modules", {"scripts.db_manager": fake_db_manager}), \
+    patch_mods = {"hackingupdate.db_manager": fake_db_manager, "scripts.db_manager": fake_db_manager}
+    with patch.dict("sys.modules", patch_mods), \
          patch("requests.post") as mock_post, patch("requests.get") as mock_get:
         whatsapp_notifier.main()
 

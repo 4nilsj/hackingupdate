@@ -49,14 +49,34 @@ def cli():
     default=None,
     help="Max article age in days (overrides ARTICLE_MAX_AGE_DAYS env var).",
 )
-def run(step, no_cache_clear, age_days):
+@click.option(
+    "--cross-day-days",
+    type=int,
+    default=None,
+    help="Days of historical findings to deduplicate against (default: 7).",
+)
+@click.option(
+    "--no-cross-day-dedupe",
+    is_flag=True,
+    default=False,
+    help="Disable cross-day SQLite deduplication.",
+)
+def run(step, no_cache_clear, age_days, cross_day_days, no_cross_day_dedupe):
     """Run the daily security briefing pipeline."""
     import os
+    import hackingupdate.config as cfg
+
     if age_days is not None:
         os.environ["ARTICLE_MAX_AGE_DAYS"] = str(age_days)
-        # Update imported config variable if needed
-        import hackingupdate.config as cfg
         cfg.ARTICLE_MAX_AGE_DAYS = age_days
+
+    if cross_day_days is not None:
+        os.environ["CROSS_DAY_DEDUPE_DAYS"] = str(cross_day_days)
+        cfg.CROSS_DAY_DEDUPE_DAYS = cross_day_days
+
+    if no_cross_day_dedupe:
+        os.environ["ENABLE_CROSS_DAY_DEDUPE"] = "false"
+        cfg.ENABLE_CROSS_DAY_DEDUPE = False
 
     if step:
         click.echo(f"🔒 Running single step: {step}")
@@ -312,6 +332,9 @@ def init():
     click.echo("  Pipeline Settings:")
     click.echo(f"    Max Article Age: {ARTICLE_MAX_AGE_DAYS} day(s)")
     click.echo(f"    LLM Batch Delay: {LLM_BATCH_DELAY}s")
+    from hackingupdate.config import CROSS_DAY_DEDUPE_DAYS, ENABLE_CROSS_DAY_DEDUPE, CISA_KEV_CACHE_FILE
+    click.echo(f"    Cross-Day Dedupe: {'✅ ' + str(CROSS_DAY_DEDUPE_DAYS) + ' days' if ENABLE_CROSS_DAY_DEDUPE else '❌ Disabled'}")
+    click.echo(f"    CISA KEV Cache:   {'✅ ' + str(CISA_KEV_CACHE_FILE) if CISA_KEV_CACHE_FILE.exists() else '⏳ Not cached yet'}")
     click.echo()
     click.echo("  API & Channel Config:")
     click.echo(f"    LLM Model:       {OPENROUTER_MODEL}")
@@ -335,7 +358,7 @@ def steps():
     click.echo("📋 Pipeline Steps:\n")
     for i, (name, _, description) in enumerate(PIPELINE_STEPS, 1):
         click.echo(f"  {i:2d}. {name:<15s}  {description}")
-    click.echo(f"\nRun a single step: hackingupdate run --step <name>")
+    click.echo("\nRun a single step: hackingupdate run --step <name>")
 
 
 # ─── db ───────────────────────────────────────────────────────────────────────
@@ -349,19 +372,18 @@ def db():
 @db.command("stats")
 def db_stats():
     """Show database summary statistics."""
-    import sys as _sys
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent / "scripts"))
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent))
-
     try:
-        from scripts import db_manager
+        from hackingupdate import db_manager
         db_manager.init_db()
         stats = db_manager.get_stats()
-        click.echo(f"📊 Database Statistics:\n")
+        click.echo("📊 Database Statistics:\n")
         click.echo(f"  Database:        {stats['db_path']}")
         click.echo(f"  Total Findings:  {stats['total_findings']}")
         click.echo(f"  Unique Days:     {stats['unique_dates']}")
         click.echo(f"  Pipeline Runs:   {stats['total_runs']}")
+        click.echo(f"  CISA KEV Alerts: {stats.get('total_cisa_kev', 0)}")
+        click.echo(f"  Ransomware Hits: {stats.get('total_ransomware', 0)}")
+        click.echo(f"  Max EPSS Score:  {stats.get('max_epss', 0.0):.1%}")
         click.echo(f"  Latest Date:     {stats['latest_date']} ({stats['latest_count']} findings)")
     except Exception as e:
         click.echo(f"❌ Could not read database: {e}")
@@ -370,12 +392,8 @@ def db_stats():
 @db.command("today")
 def db_today():
     """Show today's findings from the database."""
-    import sys as _sys
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent / "scripts"))
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent))
-
     try:
-        from scripts import db_manager
+        from hackingupdate import db_manager
         db_manager.init_db()
         findings = db_manager.get_findings_by_date()
 
@@ -387,8 +405,16 @@ def db_today():
         for f in findings:
             severity = f.get("severity", "?")
             rank = f.get("rank", 0)
-            title = f.get("title", "")[:70]
-            click.echo(f"  [{severity:8s}] Rank {rank:2d} | {title}")
+            is_kev = bool(f.get("is_cisa_kev", 0))
+            epss = float(f.get("epss_score") or 0.0)
+            badges = []
+            if is_kev:
+                badges.append("🚨 CISA KEV")
+            if epss >= 0.2:
+                badges.append(f"EPSS: {epss:.0%}")
+            badge_str = f" [{' | '.join(badges)}]" if badges else ""
+            title = f.get("title", "")[:65]
+            click.echo(f"  [{severity:8s}] Rank {rank:2d} | {title}{badge_str}")
     except Exception as e:
         click.echo(f"❌ Could not read database: {e}")
 
@@ -397,12 +423,8 @@ def db_today():
 @click.option("--limit", "-n", default=10, help="Number of runs to show.")
 def db_history(limit):
     """Show pipeline run history."""
-    import sys as _sys
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent / "scripts"))
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent))
-
     try:
-        from scripts import db_manager
+        from hackingupdate import db_manager
         db_manager.init_db()
         runs = db_manager.get_run_history(limit)
 

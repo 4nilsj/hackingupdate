@@ -110,3 +110,50 @@ def test_jaccard_similarity_partial():
 def test_jaccard_similarity_empty():
     assert jaccard_similarity([], ["test"]) == 0.0
     assert jaccard_similarity([], []) == 0.0
+
+
+def test_main_discards_cross_day_duplicate_link(tmp_path, monkeypatch):
+    articles = [
+        {"id": "1", "title": "Old Yesterday Advisory", "link": "https://example.com/yesterday"},
+        {"id": "2", "title": "Brand New Advisory", "link": "https://example.com/today"},
+    ]
+    fingerprints = {
+        "1": {"title_hash": "hash1", "keywords": ["old"]},
+        "2": {"title_hash": "hash2", "keywords": ["new"]},
+    }
+    deduped_cache = _write_cache_files(tmp_path, monkeypatch, articles, fingerprints)
+
+    # Mock historical links in db_manager
+    from scripts import db_manager
+    monkeypatch.setattr(
+        db_manager,
+        "get_recent_finding_identifiers",
+        lambda days=7, exclude_date=None: ({"https://example.com/yesterday"}, set())
+    )
+    monkeypatch.setattr(dedupe_fingerprints.config, "ENABLE_CROSS_DAY_DEDUPE", True)
+
+    dedupe_fingerprints.main()
+    result = json.loads(deduped_cache.read_text(encoding="utf-8"))
+    assert [a["id"] for a in result] == ["2"]
+
+
+def test_main_cross_day_dedupe_disabled(tmp_path, monkeypatch):
+    articles = [
+        {"id": "1", "title": "Old Advisory", "link": "https://example.com/yesterday"},
+    ]
+    fingerprints = {
+        "1": {"title_hash": "hash1", "keywords": ["old"]},
+    }
+    deduped_cache = _write_cache_files(tmp_path, monkeypatch, articles, fingerprints)
+
+    from scripts import db_manager
+    monkeypatch.setattr(
+        db_manager,
+        "get_recent_finding_identifiers",
+        lambda days=7, exclude_date=None: ({"https://example.com/yesterday"}, set())
+    )
+    monkeypatch.setattr(dedupe_fingerprints.config, "ENABLE_CROSS_DAY_DEDUPE", False)
+
+    dedupe_fingerprints.main()
+    result = json.loads(deduped_cache.read_text(encoding="utf-8"))
+    assert [a["id"] for a in result] == ["1"]

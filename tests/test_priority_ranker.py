@@ -11,6 +11,7 @@ from hackingupdate import config
 from scripts import priority_ranker
 from scripts.priority_ranker import (
     _call_openrouter_with_retry,
+    _sanitize_llm_rank,
     fallback_rank_and_tag,
     rank_batch_with_llm,
 )
@@ -251,3 +252,42 @@ def test_rank_batch_without_api_key(monkeypatch):
     assert len(rankings) == 1
     assert rankings[0]["id"] == "1"
     assert "web" in rankings[0]["tags"]
+
+
+def test_fallback_rank_and_tag_cisa_kev():
+    sample_article = {
+        "id": "kev-1",
+        "title": "Advisory on Vulnerability",
+        "content_text": "Vendor patch released.",
+        "source": "Feed",
+        "is_cisa_kev": True,
+        "cisa_ransomware": False,
+    }
+    result = fallback_rank_and_tag(sample_article)
+    assert result["rank"] >= 8
+    assert "CISA KEV" in result["reason"]
+
+
+def test_fallback_rank_and_tag_cisa_ransomware():
+    sample_article = {
+        "id": "rw-1",
+        "title": "Advisory on Vulnerability",
+        "content_text": "Vendor patch released.",
+        "source": "Feed",
+        "is_cisa_kev": True,
+        "cisa_ransomware": True,
+    }
+    result = fallback_rank_and_tag(sample_article)
+    assert result["rank"] >= 9
+    assert "Ransomware" in result["reason"]
+
+
+def test_sanitize_llm_rank_cisa_kev_floor():
+    article_kev = {"is_cisa_kev": True, "cisa_ransomware": False}
+    article_rw = {"is_cisa_kev": True, "cisa_ransomware": True}
+    article_epss = {"is_cisa_kev": False, "epss_score": 0.85}
+
+    # Even if LLM assigned rank 2, KEV should force floor
+    assert _sanitize_llm_rank(2, article_kev) == 8
+    assert _sanitize_llm_rank(2, article_rw) == 9
+    assert _sanitize_llm_rank(2, article_epss) == 7

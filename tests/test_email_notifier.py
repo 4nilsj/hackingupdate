@@ -40,7 +40,8 @@ def test_load_working_set_falls_back_to_db(tmp_path, monkeypatch):
 
     fake_db_manager = MagicMock()
     fake_db_manager.get_findings_by_date.return_value = [{"title": "From DB"}]
-    with patch.dict("sys.modules", {"scripts.db_manager": fake_db_manager}):
+    patch_mods = {"hackingupdate.db_manager": fake_db_manager, "scripts.db_manager": fake_db_manager}
+    with patch.dict("sys.modules", patch_mods):
         result = email_notifier.load_working_set_with_fallback()
 
     assert result == [{"title": "From DB"}]
@@ -52,7 +53,8 @@ def test_load_working_set_returns_empty_when_nothing_available(tmp_path, monkeyp
 
     fake_db_manager = MagicMock()
     fake_db_manager.get_findings_by_date.return_value = []
-    with patch.dict("sys.modules", {"scripts.db_manager": fake_db_manager}):
+    patch_mods = {"hackingupdate.db_manager": fake_db_manager, "scripts.db_manager": fake_db_manager}
+    with patch.dict("sys.modules", patch_mods):
         result = email_notifier.load_working_set_with_fallback()
 
     assert result == []
@@ -67,7 +69,9 @@ def test_severity_badge_thresholds():
 
 
 def test_format_email_html_includes_summary_and_findings():
-    working_set = [{"title": "Critical RCE", "link": "https://example.com/1", "rank": 9, "source": "CISA", "tags": ["web"]}]
+    working_set = [
+        {"title": "Critical RCE", "link": "https://example.com/1", "rank": 9, "source": "CISA", "tags": ["web"]}
+    ]
     html = email_notifier.format_email_html("2026-08-30", "All quiet.", working_set)
 
     assert "2026-08-30" in html
@@ -166,7 +170,8 @@ def test_main_happy_path_sends_email(tmp_path, monkeypatch):
     fake_db_manager = MagicMock()
     fake_db_manager.get_findings_by_date.return_value = []
 
-    with patch.dict("sys.modules", {"scripts.db_manager": fake_db_manager}), \
+    patch_mods = {"hackingupdate.db_manager": fake_db_manager, "scripts.db_manager": fake_db_manager}
+    with patch.dict("sys.modules", patch_mods), \
          patch.object(email_notifier, "send_email", return_value=True) as mock_send:
         email_notifier.main()
 
