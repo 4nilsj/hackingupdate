@@ -173,7 +173,7 @@ def main():
 
     if config.TWILIO_ACCOUNT_SID and config.TWILIO_AUTH_TOKEN and config.TWILIO_TO_NUMBER:
         logger.info("Twilio settings detected. Initiating Twilio WhatsApp delivery...")
-        send_twilio_notification(
+        success = send_twilio_notification(
             config.TWILIO_ACCOUNT_SID,
             config.TWILIO_AUTH_TOKEN,
             config.TWILIO_FROM_NUMBER,
@@ -182,9 +182,15 @@ def main():
         )
     elif config.WHATSAPP_API_URL and config.WHATSAPP_TOKEN and config.WHATSAPP_RECIPIENT:
         logger.info("Gateway settings detected. Initiating WhatsApp gateway delivery...")
-        send_whatsapp_notification(config.WHATSAPP_API_URL, config.WHATSAPP_TOKEN, config.WHATSAPP_RECIPIENT, message_text)
+        success = send_whatsapp_notification(
+            config.WHATSAPP_API_URL, config.WHATSAPP_TOKEN, config.WHATSAPP_RECIPIENT, message_text
+        )
     else:
         logger.info("Neither Twilio nor generic WhatsApp notification settings are fully configured. Skipping WhatsApp notification.")
+        return
+
+    if not success:
+        raise SystemExit(1)
 
 if __name__ == "__main__":
     main()

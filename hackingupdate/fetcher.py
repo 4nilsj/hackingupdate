@@ -100,6 +100,7 @@ def main():
         sys.exit(0)
 
     raw_articles: list[dict] = []
+    successful_feeds = 0
 
     # Fetch all feeds concurrently for significant speedup
     logger.info(f"Fetching {len(urls)} feeds concurrently with {MAX_WORKERS} workers...")
@@ -113,12 +114,17 @@ def main():
                     logger.warning(f"No entries found for feed: {feed_url}")
                     continue
 
+                successful_feeds += 1
                 feed_title = feed.feed.get("title", feed_url)
                 logger.info(f"Found {len(feed.entries)} entries in '{feed_title}'")
                 articles = _extract_articles_from_feed(feed_url, feed)
                 raw_articles.extend(articles)
             except Exception as e:
                 logger.error(f"Unexpected error processing feed {url}: {e}")
+
+    if successful_feeds == 0:
+        logger.critical("No feeds returned entries; refusing to replace the raw cache with an empty result.")
+        sys.exit(1)
 
     # Save raw articles to cache
     try:

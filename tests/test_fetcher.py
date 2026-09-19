@@ -2,9 +2,11 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 import requests
 
 from scripts.fetcher import _extract_articles_from_feed, fetch_feed
+from scripts import fetcher
 
 
 def test_fetch_feed_success():
@@ -76,3 +78,18 @@ def test_extract_articles_from_feed():
     assert articles[0]["title"] == "Advisory Title"
     assert articles[0]["feed_title"] == "Test Source"
     assert articles[0]["link"] == "https://example.com/1"
+
+
+def test_main_fails_when_no_feed_returns_entries(tmp_path, monkeypatch):
+    feeds_file = tmp_path / "feeds.txt"
+    feeds_file.write_text("https://example.com/rss.xml\n", encoding="utf-8")
+    monkeypatch.setattr(fetcher.config, "FEEDS_FILE", feeds_file)
+    monkeypatch.setattr(fetcher.config, "RAW_CACHE_FILE", tmp_path / "articles_raw.json")
+
+    empty_feed = MagicMock(entries=[])
+    with patch.object(fetcher, "fetch_feed", return_value=("https://example.com/rss.xml", empty_feed)):
+        with pytest.raises(SystemExit) as exc_info:
+            fetcher.main()
+
+    assert exc_info.value.code == 1
+    assert not (tmp_path / "articles_raw.json").exists()

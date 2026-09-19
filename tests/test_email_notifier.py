@@ -3,6 +3,8 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from scripts import email_notifier
 
 
@@ -178,3 +180,18 @@ def test_main_happy_path_sends_email(tmp_path, monkeypatch):
     mock_send.assert_called_once()
     args, _ = mock_send.call_args
     assert "Daily Security Intelligence Briefing" in args[0]
+
+
+def test_main_exits_when_delivery_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(email_notifier, "SMTP_HOST", "smtp.example.com")
+    monkeypatch.setattr(email_notifier, "SMTP_FROM_EMAIL", "brief@example.com")
+    monkeypatch.setattr(email_notifier, "SMTP_TO_EMAILS", "secops@example.com")
+    monkeypatch.setattr(email_notifier, "REPORTS_DIR", tmp_path)
+    monkeypatch.setattr(email_notifier, "WORKING_CACHE_FILE", tmp_path / "missing.json")
+    monkeypatch.setattr(email_notifier, "RANKED_CACHE_FILE", tmp_path / "missing2.json")
+
+    with patch.object(email_notifier, "send_email", return_value=False):
+        with pytest.raises(SystemExit) as exc_info:
+            email_notifier.main()
+
+    assert exc_info.value.code == 1

@@ -112,3 +112,17 @@ def test_main_happy_path_sends_notification(tmp_path, monkeypatch):
         teams_notifier.main()
 
     mock_post.assert_called_once()
+
+
+def test_main_exits_when_delivery_fails(tmp_path, monkeypatch):
+    working_cache = tmp_path / "articles_working.json"
+    working_cache.write_text(json.dumps(_sample_working_set()), encoding="utf-8")
+    monkeypatch.setattr(teams_notifier.config, "TEAMS_WEBHOOK_URL", "https://webhook.example.com/x")
+    monkeypatch.setattr(teams_notifier.config, "WORKING_CACHE_FILE", working_cache)
+    monkeypatch.setattr(teams_notifier.config, "REPORTS_DIR", tmp_path)
+
+    with patch.object(teams_notifier, "send_teams_notification", return_value=False):
+        with pytest.raises(SystemExit) as exc_info:
+            teams_notifier.main()
+
+    assert exc_info.value.code == 1

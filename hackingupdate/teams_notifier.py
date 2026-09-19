@@ -104,7 +104,8 @@ def main():
     logger.info("Parsing executive summary...")
     exec_summary = parse_executive_summary(md_report_file)
 
-    send_teams_notification(config.TEAMS_WEBHOOK_URL, today_str, exec_summary, working_set)
+    if not send_teams_notification(config.TEAMS_WEBHOOK_URL, today_str, exec_summary, working_set):
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

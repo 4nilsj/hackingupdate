@@ -124,13 +124,18 @@ def notify(whatsapp, teams, email, all_channels, channel):
     if email or all_channels:
         steps.append("email")
 
+    failed = False
     for step_name in steps:
         click.echo(f"📤 Sending {step_name} notification...")
         success = run_step(step_name)
         if not success:
+            failed = True
             click.echo(f"  ❌ {step_name} notification failed.")
         else:
             click.echo(f"  ✅ {step_name} notification sent!")
+
+    if failed:
+        raise SystemExit(1)
 
 
 # ─── feeds ────────────────────────────────────────────────────────────────────

@@ -193,7 +193,8 @@ def main():
     html_body = format_email_html(today_str, exec_summary, working_set)
 
     subject = f"🛡️ Daily Security Intelligence Briefing - {today_str}"
-    send_email(subject, html_body)
+    if not send_email(subject, html_body):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

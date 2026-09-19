@@ -3,6 +3,7 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
 import requests
 
 from scripts import whatsapp_notifier
@@ -223,3 +224,21 @@ def test_main_skips_when_nothing_configured(tmp_path, monkeypatch):
 
     mock_post.assert_not_called()
     mock_get.assert_not_called()
+
+
+def test_main_exits_when_twilio_delivery_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(whatsapp_notifier.config, "WORKING_CACHE_FILE", tmp_path / "missing.json")
+    monkeypatch.setattr(whatsapp_notifier.config, "RANKED_CACHE_FILE", tmp_path / "missing2.json")
+    monkeypatch.setattr(whatsapp_notifier.config, "REPORTS_DIR", tmp_path)
+    monkeypatch.setattr(whatsapp_notifier.config, "TWILIO_ACCOUNT_SID", "ACxxx")
+    monkeypatch.setattr(whatsapp_notifier.config, "TWILIO_AUTH_TOKEN", "authtoken")
+    monkeypatch.setattr(whatsapp_notifier.config, "TWILIO_TO_NUMBER", "whatsapp:+919999999999")
+    monkeypatch.setattr(whatsapp_notifier.config, "WHATSAPP_API_URL", "")
+    monkeypatch.setattr(whatsapp_notifier.config, "WHATSAPP_TOKEN", "")
+    monkeypatch.setattr(whatsapp_notifier.config, "WHATSAPP_RECIPIENT", "")
+
+    with patch.object(whatsapp_notifier, "send_twilio_notification", return_value=False):
+        with pytest.raises(SystemExit) as exc_info:
+            whatsapp_notifier.main()
+
+    assert exc_info.value.code == 1

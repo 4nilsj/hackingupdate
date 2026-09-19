@@ -206,8 +206,9 @@ def store_findings(articles: list[dict], briefing_date: date | None = None) -> d
                     cves, is_cisa_kev, epss_score, cisa_ransomware
                 ))
                 stored += 1
-            except sqlite3.IntegrityError:
-                # Duplicate: same link on same date — skip silently
+            except sqlite3.IntegrityError as exc:
+                if "UNIQUE constraint failed: findings.briefing_date, findings.link" not in str(exc):
+                    raise
                 skipped += 1
                 logger.debug(f"Skipped duplicate: {title}")
 
