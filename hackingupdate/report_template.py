@@ -295,6 +295,126 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             margin-top: 0.1rem;
         }}
 
+        .priority-queue {{
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(19, 27, 46, 0.9) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 18px;
+            padding: 1.5rem 1.6rem 1.2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+        }}
+
+        .priority-header-row {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }}
+
+        .priority-header-row h2 {{
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.2rem;
+            color: #fca5a5;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }}
+
+        .priority-caption {{
+            display: inline-flex;
+            align-items: center;
+            padding: 0.35rem 0.7rem;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            border-radius: 999px;
+            color: #fecaca;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }}
+
+        .priority-list {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0.85rem;
+        }}
+
+        .priority-item {{
+            background: rgba(9, 13, 22, 0.56);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 12px;
+            padding: 0.9rem 1rem;
+        }}
+
+        .priority-item.critical {{
+            border-color: rgba(239, 68, 68, 0.35);
+            background: rgba(127, 29, 29, 0.08);
+        }}
+
+        .priority-item.high {{
+            border-color: rgba(245, 158, 11, 0.3);
+            background: rgba(120, 53, 15, 0.08);
+        }}
+
+        .priority-topline {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.6rem;
+        }}
+
+        .priority-index {{
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }}
+
+        .priority-badge {{
+            padding: 0.2rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }}
+
+        .priority-badge.critical {{
+            background: rgba(239, 68, 68, 0.14);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }}
+
+        .priority-badge.high {{
+            background: rgba(245, 158, 11, 0.14);
+            color: #fcd34d;
+            border: 1px solid rgba(245, 158, 11, 0.4);
+        }}
+
+        .priority-badge.medium {{
+            background: rgba(56, 189, 248, 0.14);
+            color: #93c5fd;
+            border: 1px solid rgba(56, 189, 248, 0.35);
+        }}
+
+        .priority-title {{
+            font-size: 0.98rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.45;
+            margin-bottom: 0.45rem;
+        }}
+
+        .priority-meta {{
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            letter-spacing: 0.02em;
+        }}
+
         /* Executive Summary Section */
         .executive-summary {{
             background: linear-gradient(135deg, rgba(19, 27, 46, 0.95) 0%, rgba(192, 132, 252, 0.1) 100%);
@@ -985,8 +1105,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <span class="badge-pulse"></span>
                 Security Intelligence Briefing
             </div>
-            <h1>Daily Vulnerability & Exploit Digest</h1>
-            <p class="date">📅 {date} &nbsp;•&nbsp; Curated for Penetration Testers & SecOps</p>
+            <h1>Daily AppSec Triage Digest</h1>
+            <p class="date">📅 {date} &nbsp;•&nbsp; Curated for AppSec, SecOps, and Engineering Teams</p>
         </header>
 
         <!-- Metrics Banner -->

@@ -91,6 +91,50 @@ Trusting a client-supplied role header instead of re-checking authorization serv
     finally:
         Path(temp_path).unlink()
 
+
+def test_parse_markdown_to_premium_html_renders_priority_queue_summary():
+    md_content = """# Daily Security Intelligence Briefing - 2026-07-29
+
+## Executive Summary
+Test summary.
+
+## Category: WEB
+### Critical RCE in Example Platform
+- **Source**: SecurityWeek
+- **Priority Rank**: `9/10`
+- **Link**: https://example.com/critical-rce
+- **Pentester Category Tags**: web
+
+**Description & Context**:
+- Exploit chain for unauthenticated code execution.
+
+---
+
+## Category: CLOUD
+### High-severity IAM Drift
+- **Source**: The Hacker News
+- **Priority Rank**: `7/10`
+- **Link**: https://example.com/iam-drift
+- **Pentester Category Tags**: cloud
+
+**Description & Context**:
+- Privilege escalation in IAM policies.
+
+---
+"""
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
+        f.write(md_content)
+        temp_path = f.name
+
+    try:
+        html = parse_markdown_to_premium_html(temp_path, "2026-07-29")
+        assert "Priority Queue" in html
+        assert "Immediate triage" in html
+        assert "Critical RCE in Example Platform" in html
+    finally:
+        Path(temp_path).unlink()
+
+
 def test_parse_markdown_to_premium_html_deduplication():
     md_content = """# Daily Security Intelligence Briefing - 2026-07-29
 

@@ -98,15 +98,14 @@ def parse_markdown_to_premium_html(md_path, today_str):
 
     body_html_parts = []
 
-    if exec_summary_html:
-        body_html_parts.append(exec_summary_html)
-
     critical_count = 0
     high_count = 0
     total_count = 0
 
     seen_articles = {}  # key: norm_key -> dict of article metadata & rendered content
     article_keys_order = []
+
+    priority_queue = []
 
     for section in sections:
         if not section.strip():
@@ -257,6 +256,46 @@ def parse_markdown_to_premium_html(md_path, today_str):
                 "checklist_box_html": _sanitize_html(checklist_box_html)
             }
             article_keys_order.append(norm_key)
+            priority_queue.append({
+                "title": html_escape(art_title),
+                "source": html_escape(source),
+                "category": category_name,
+                "rank": rank_num,
+                "link": _safe_link(link),
+            })
+
+    priority_priority = sorted(priority_queue, key=lambda item: item["rank"], reverse=True)[:3]
+    priority_items_html = []
+    for idx, item in enumerate(priority_priority, start=1):
+        severity_key = "critical" if item["rank"] >= 8 else "high" if item["rank"] >= 6 else "medium"
+        priority_items_html.append(f'''
+        <div class="priority-item {severity_key}">
+            <div class="priority-topline">
+                <span class="priority-index">#{idx}</span>
+                <span class="priority-badge {severity_key}">{severity_key}</span>
+            </div>
+            <div class="priority-title"><a href="{item['link']}" target="_blank" style="color: inherit; text-decoration: none;">{item['title']}</a></div>
+            <div class="priority-meta">{item['category']} • {item['source']} • Rank {item['rank']}/10</div>
+        </div>
+        ''')
+
+    priority_queue_html = ""
+    if priority_items_html:
+        priority_queue_html = f'''
+        <div class="priority-queue">
+            <div class="priority-header-row">
+                <h2>Priority Queue</h2>
+                <span class="priority-caption">Immediate triage</span>
+            </div>
+            <div class="priority-list">
+                {''.join(priority_items_html)}
+            </div>
+        </div>
+        '''
+    if priority_queue_html:
+        body_html_parts.append(priority_queue_html)
+    if exec_summary_html:
+        body_html_parts.append(exec_summary_html)
 
     # Group unique articles by category and build HTML cards
     category_grouped_html = {}
