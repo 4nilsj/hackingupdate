@@ -1,5 +1,6 @@
 import sys
 import json
+import random
 import requests
 import feedparser
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -11,24 +12,118 @@ logger = config.get_logger("fetcher")
 # Maximum number of concurrent feed fetch workers
 MAX_WORKERS: int = 8
 
+# ---------------------------------------------------------------------------
+# Realistic browser header profiles — rotated per-fetch to avoid 403 blocks.
+# Sites like CISA, BleepingComputer, SecurityWeek, and Talos inspect
+# User-Agent, Accept, Accept-Encoding, and Cache-Control to detect bots.
+# ---------------------------------------------------------------------------
+_BROWSER_PROFILES: list[dict] = [
+    {
+        # Chrome 128 on macOS
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/128.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "DNT": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Upgrade-Insecure-Requests": "1",
+    },
+    {
+        # Chrome 127 on Windows
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/127.0.6533.99 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-GB,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Cache-Control": "max-age=0",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "cross-site",
+        "Upgrade-Insecure-Requests": "1",
+    },
+    {
+        # Firefox 129 on Linux
+        "User-Agent": (
+            "Mozilla/5.0 (X11; Linux x86_64; rv:129.0) "
+            "Gecko/20100101 Firefox/129.0"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "DNT": "1",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+    },
+    {
+        # Safari 17 on macOS
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            "Version/17.5 Safari/605.1.15"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+    },
+]
+
+
+def _pick_headers() -> dict:
+    """Return a randomly selected browser header profile."""
+    return dict(random.choice(_BROWSER_PROFILES))
+
+
+def _pick_different_headers(used: dict) -> dict:
+    """Return a different profile than the one already used."""
+    ua_used = used.get("User-Agent", "")
+    alternates = [p for p in _BROWSER_PROFILES if p.get("User-Agent") != ua_used]
+    return dict(random.choice(alternates) if alternates else random.choice(_BROWSER_PROFILES))
+
 
 def fetch_feed(url: str) -> tuple[str, "feedparser.FeedParserDict | None"]:
     """Fetch and parse a single RSS/Atom feed URL.
+
+    Uses rotating browser header profiles to avoid bot-detection 403 blocks.
+    On a 403 it retries once with a different profile before falling through
+    to direct feedparser parsing.
 
     Returns:
         Tuple of (url, parsed_feed_or_None).
     """
     logger.info(f"Fetching feed: {url}")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-    }
+    headers = _pick_headers()
 
     response = None
     try:
         response = requests.get(url, headers=headers, timeout=15)
+
+        # On 403 — retry once with a different browser profile before giving up
+        if response.status_code == 403:
+            retry_headers = _pick_different_headers(headers)
+            logger.warning(
+                f"403 for {url} — retrying with alternate browser profile "
+                f"({retry_headers.get('User-Agent', '')[:40]}...)"
+            )
+            response = requests.get(url, headers=retry_headers, timeout=15)
+
         response.raise_for_status()
+
     except requests.exceptions.SSLError as ssl_err:
         # Never retry with verification disabled — that would accept a MITM'd
         # response and feed attacker-controlled content into the ranker/report.
@@ -47,7 +142,7 @@ def fetch_feed(url: str) -> tuple[str, "feedparser.FeedParserDict | None"]:
         except Exception as parse_err:
             logger.warning(f"Failed to parse XML content for {url}: {parse_err}")
 
-    # Fallback to direct feedparser parsing
+    # Fallback to direct feedparser parsing (uses its own User-Agent)
     try:
         logger.info(f"Retrying {url} directly with feedparser...")
         feed = feedparser.parse(url)

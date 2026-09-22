@@ -1,17 +1,21 @@
 """Unit tests for feed fetching module."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 import pytest
 import requests
 
-from scripts.fetcher import _extract_articles_from_feed, fetch_feed
+from scripts.fetcher import _extract_articles_from_feed, fetch_feed, _pick_headers, _pick_different_headers, _BROWSER_PROFILES
 from scripts import fetcher
 
 
-def test_fetch_feed_success():
+def _make_rss_response(status_code=200):
+    """Build a minimal mock HTTP response with valid RSS content."""
     mock_resp = MagicMock()
-    mock_resp.status_code = 200
+    mock_resp.status_code = status_code
+    mock_resp.raise_for_status.return_value = None
+    if status_code == 403:
+        mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError("403")
     mock_resp.content = b"""<?xml version="1.0"?>
     <rss version="2.0">
       <channel>
@@ -23,6 +27,11 @@ def test_fetch_feed_success():
         </item>
       </channel>
     </rss>"""
+    return mock_resp
+
+
+def test_fetch_feed_success():
+    mock_resp = _make_rss_response(200)
 
     with patch("requests.get", return_value=mock_resp):
         url, feed = fetch_feed("https://example.com/rss.xml")
@@ -30,6 +39,33 @@ def test_fetch_feed_success():
         assert feed is not None
         assert len(feed.entries) == 1
         assert feed.entries[0].title == "Test Security Advisory"
+
+
+def test_fetch_feed_retries_on_403_with_different_profile():
+    """A 403 on first attempt triggers exactly one retry with a DIFFERENT User-Agent profile."""
+    first_403 = _make_rss_response(403)
+    second_200 = _make_rss_response(200)
+    second_200.raise_for_status.return_value = None
+
+    with patch("requests.get", side_effect=[first_403, second_200]) as mock_get:
+        url, feed = fetch_feed("https://example.com/rss.xml")
+
+    assert mock_get.call_count == 2
+    # The two calls must have used different User-Agent strings
+    ua_first = mock_get.call_args_list[0].kwargs.get("headers", {}).get("User-Agent", "")
+    ua_second = mock_get.call_args_list[1].kwargs.get("headers", {}).get("User-Agent", "")
+    assert ua_first != ua_second, "Retry must use a different User-Agent than the first attempt"
+
+
+def test_fetch_feed_403_falls_back_to_feedparser_when_retry_also_fails():
+    """If both attempts return 403, fall through to feedparser fallback."""
+    four_oh_three = _make_rss_response(403)
+
+    with patch("requests.get", return_value=four_oh_three), \
+         patch("feedparser.parse", return_value=MagicMock(entries=[])) as mock_parse:
+        fetch_feed("https://example.com/rss.xml")
+
+    mock_parse.assert_called_once_with("https://example.com/rss.xml")
 
 
 def test_fetch_feed_ssl_error_never_retries_insecurely():
@@ -41,8 +77,8 @@ def test_fetch_feed_ssl_error_never_retries_insecurely():
     ) as mock_get, patch("feedparser.parse", return_value=MagicMock(entries=[])) as mock_parse:
         fetch_feed("https://example.com/rss.xml")
         assert mock_get.call_count == 1
-        for call in mock_get.call_args_list:
-            assert call.kwargs.get("verify", True) is not False
+        for c in mock_get.call_args_list:
+            assert c.kwargs.get("verify", True) is not False
         # falls back to feedparser parsing the URL directly
         mock_parse.assert_called_once_with("https://example.com/rss.xml")
 
@@ -55,8 +91,32 @@ def test_fetch_feed_non_ssl_error_does_not_retry_insecurely():
     ) as mock_get, patch("feedparser.parse", return_value=MagicMock(entries=[])):
         fetch_feed("https://example.com/rss.xml")
         assert mock_get.call_count == 1
-        for call in mock_get.call_args_list:
-            assert call.kwargs.get("verify", True) is not False
+        for c in mock_get.call_args_list:
+            assert c.kwargs.get("verify", True) is not False
+
+
+def test_pick_headers_returns_valid_profile():
+    """_pick_headers must always return a dict with at least User-Agent and Accept."""
+    headers = _pick_headers()
+    assert isinstance(headers, dict)
+    assert "User-Agent" in headers
+    assert "Accept" in headers
+
+
+def test_pick_different_headers_returns_alternate_ua():
+    """_pick_different_headers must return a profile with a different User-Agent."""
+    original = _pick_headers()
+    alternate = _pick_different_headers(original)
+    # With 4 profiles there is always at least one alternative
+    assert alternate.get("User-Agent") != original.get("User-Agent")
+
+
+def test_browser_profiles_all_have_required_fields():
+    """Every profile in _BROWSER_PROFILES must have User-Agent, Accept, Accept-Language, Accept-Encoding."""
+    required = {"User-Agent", "Accept", "Accept-Language", "Accept-Encoding"}
+    for profile in _BROWSER_PROFILES:
+        missing = required - set(profile.keys())
+        assert not missing, f"Profile missing fields: {missing} in {profile.get('User-Agent')}"
 
 
 def test_extract_articles_from_feed():
