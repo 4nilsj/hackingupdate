@@ -10,6 +10,64 @@ import hackingupdate.config as config
 
 logger = config.get_logger("report_generator")
 
+def _normalize_reason_text(reason):
+    if not reason:
+        return "Priority based on exploitability, exposure, and threat intelligence signals."
+
+    cleaned = str(reason).strip()
+    cleaned = re.sub(r"^Fallback:\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^Tagged via keyword heuristics.*?matching\s*\[.*?\]\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^Tagged via keyword heuristics.*?", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*\[(?:CISA KEV|EPSS|.*?signal.*?)\]\s*$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned:
+        return "Priority based on exploitability, exposure, and threat intelligence signals."
+    if not cleaned.endswith("."):
+        cleaned += "."
+    return cleaned
+
+
+def _infer_threat_model(article):
+    title = (article.get("title") or "").lower()
+    content = (article.get("content_text") or "").lower()
+    combined = f"{title} {content}"
+
+    if any(term in combined for term in ["rce", "remote code execution", "code execution", "command injection", "unauthenticated", "auth bypass"]):
+        return {
+            "stride": "Remote Code Execution / Elevation of Privilege",
+            "design_flaw": "Missing trust boundary validation and insufficient authentication or authorization enforcement before sensitive operations.",
+            "principle": "Least privilege and validate untrusted input before execution.",
+            "review_question": "How do we verify trust boundaries and validate input before executing sensitive operations?"
+        }
+    if any(term in combined for term in ["privilege escalation", "iam", "policy", "bypass", "auth bypass", "misconfiguration"]):
+        return {
+            "stride": "Elevation of Privilege",
+            "design_flaw": "Improper authorization checks or insecure default configuration allow privilege escalation.",
+            "principle": "Least privilege and secure-by-default configuration.",
+            "review_question": "What authorization and configuration checks prevent an attacker from escalating privileges or abusing default access?"
+        }
+    if any(term in combined for term in ["sqli", "sql injection", "xss", "ssrf", "injection", "csrf"]):
+        return {
+            "stride": "Tampering / Information Disclosure",
+            "design_flaw": "Untrusted user-controlled input is used in application logic or outbound requests without strict validation.",
+            "principle": "Defense in depth and strict input validation.",
+            "review_question": "Where does the application trust user-controlled input, and how is it sanitized before use in queries or requests?"
+        }
+    if any(term in combined for term in ["kubernetes", "container", "cloud", "aws", "azure", "helm", "iam", "storage"]):
+        return {
+            "stride": "Information Disclosure / Privilege Escalation",
+            "design_flaw": "Misconfigured cloud or container permissions expand attack surface beyond intended trust boundaries.",
+            "principle": "Defense in depth and secure default cloud configuration.",
+            "review_question": "Which identity, network, and workload boundaries are enforced to reduce lateral movement and privilege abuse?"
+        }
+    return {
+        "stride": "Information Disclosure",
+        "design_flaw": "Insufficient security controls and weak validation around a sensitive workflow or exposure path.",
+        "principle": "Defense in depth and secure-by-default design.",
+        "review_question": "Which controls validate trust and constrain risky actions before data or functionality is exposed?"
+    }
+
+
 def format_readable_description(text):
     if not text:
         return "- No description available."
@@ -67,19 +125,39 @@ def format_readable_description(text):
     return "\n".join([f"- {b}" for b in bullets])
 
 def generate_local_fallback_report(working_set, today_str):
-    # Basic Markdown generator if LLM is unavailable
+    # Basic Markdown generator if LLM is unavailable.
+    # Keep it concise, ranked, and action-oriented rather than filled with
+    # placeholder text and generic noise.
+    relevant_items = [art for art in working_set if int(art.get("rank", 0) or 0) >= 4]
+    if not relevant_items:
+        relevant_items = working_set[:5]
+
+    sorted_items = sorted(relevant_items, key=lambda art: int(art.get("rank", 0) or 0), reverse=True)
+
     md = []
     md.append(f"# Daily Security Intelligence Briefing - {today_str}\n")
-    md.append("> **Note**: This report was generated using fallback template heuristics because OPENROUTER_API_KEY is not configured.\n")
     md.append("## Executive Summary\n")
-    md.append(f"Today's feed collection yielded **{len(working_set)}** high-priority items. Here is a categorized breakdown of active security alerts, exploits, and technical updates.\n")
+    summary_count = len(sorted_items)
+    critical_count = sum(1 for art in sorted_items if int(art.get("rank", 0) or 0) >= 8)
+    high_count = sum(1 for art in sorted_items if 6 <= int(art.get("rank", 0) or 0) < 8)
+    md.append(
+        f"The current briefing highlights **{summary_count}** relevant findings, including **{critical_count}** critical and **{high_count}** high-priority items. The focus is on actionable vulnerabilities, exploited issues, and high-risk changes that warrant triage or patch validation.\n"
+    )
 
-    # Track output articles to guarantee single post output
+    top_items = sorted_items[:3]
+    if top_items:
+        md.append("## Priority Queue\n")
+        for index, art in enumerate(top_items, start=1):
+            score = int(art.get("rank", 0) or 0)
+            severity = "Critical" if score >= 8 else "High" if score >= 6 else "Medium"
+            md.append(f"{index}. **{art['title']}** — {severity} ({score}/10) — {art.get('source', 'Unknown source')}\n")
+        md.append("")
+
     seen_ids = set()
     categorized = {tag: [] for tag in config.PENTEST_TAGS}
     uncategorized = []
 
-    for art in working_set:
+    for art in sorted_items:
         art_id = art.get("id", art["title"])
         if art_id in seen_ids:
             continue
@@ -90,13 +168,12 @@ def generate_local_fallback_report(working_set, today_str):
             if tag in categorized:
                 categorized[tag].append(art)
                 placed = True
-                break  # Place in primary category only to prevent duplicate post cards
+                break
         if not placed:
             uncategorized.append(art)
 
-    # Output categorized items
     for tag in config.PENTEST_TAGS:
-        items = categorized[tag]
+        items = sorted(categorized[tag], key=lambda art: int(art.get("rank", 0) or 0), reverse=True)
         if not items:
             continue
         md.append(f"## Category: {tag.upper()}\n")
@@ -113,30 +190,32 @@ def generate_local_fallback_report(working_set, today_str):
             epss = float(art.get("epss_score") or 0.0)
             if epss >= 0.15:
                 md.append(f"- **EPSS Exploit Prediction**: `{epss:.1%}` probability of exploitation")
-            md.append(f"- **Reasoning**: {art.get('rank_reason', 'N/A')}\n")
+            md.append(f"- **Reasoning**: {_normalize_reason_text(art.get('rank_reason', 'N/A'))}\n")
 
             if art.get('rank', 5) >= 7:
-                md.append("**Threat Modeling & Secure Design Lesson**:\n\n"
-                          "- *STRIDE Threat*: [Configure OPENROUTER_API_KEY to activate AI STRIDE threat classification]\n"
-                          "- *Design Flaw*: [Configure OPENROUTER_API_KEY to map the underlying architectural design flaw]\n"
-                          "- *Secure Design Principle*: [Configure OPENROUTER_API_KEY to specify the secure design defense principle]\n"
-                          "- *Secure Design Review Question*: How does our system validate untrusted inputs before execution?\n")
+                threat = _infer_threat_model(art)
+                md.append("**Threat Modeling & Secure Design Lesson**:\n")
+                md.append(f"- *STRIDE Threat*: {threat['stride']}\n")
+                md.append(f"- *Design Flaw*: {threat['design_flaw']}\n")
+                md.append(f"- *Secure Design Principle*: {threat['principle']}\n")
+                md.append(f"- *Secure Design Review Question*: {threat['review_question']}\n")
 
-            readable_desc = format_readable_description(art['content_text'])
+            readable_desc = format_readable_description(art.get('content_text', ''))
             md.append(f"**Description & Context**:\n\n{readable_desc}\n")
             md.append("---\n")
 
     if uncategorized:
         md.append("## General Security Updates\n")
-        for art in uncategorized:
+        for art in sorted(uncategorized, key=lambda a: int(a.get("rank", 0) or 0), reverse=True):
             tags_str = ", ".join(art.get("tags", ["news"]))
             md.append(f"### {art['title']}")
             md.append(f"- **Source**: {art['source']}")
             md.append(f"- **Priority Rank**: `{art.get('rank', 5)}/10`")
             md.append(f"- **Link**: [{art['link']}]({art['link']})")
             md.append(f"- **Pentester Category Tags**: {tags_str}")
+            md.append(f"- **Reasoning**: {_normalize_reason_text(art.get('rank_reason', 'N/A'))}\n")
 
-            readable_desc = format_readable_description(art['content_text'])
+            readable_desc = format_readable_description(art.get('content_text', ''))
             md.append(f"**Description & Context**:\n\n{readable_desc}\n")
             md.append("---\n")
 

@@ -116,11 +116,14 @@ def fallback_rank_and_tag(article):
         assigned_tags.append("infra" if article.get("is_cisa_kev") else "network")
 
     reason_suffix = f" [{'; '.join(reason_notes)}]" if reason_notes else ""
+    reason_text = f"Keyword-based prioritization matched {', '.join(assigned_tags)}.{reason_suffix}"
+    if not reason_suffix:
+        reason_text = f"Keyword-based prioritization matched {', '.join(assigned_tags)}."
     return {
         "id": article["id"],
         "rank": rank,
         "tags": list(set(assigned_tags)),
-        "reason": f"Fallback: Tagged via keyword heuristics matching {[t for t in assigned_tags]}{reason_suffix}."
+        "reason": reason_text.strip()
     }
 
 def rank_batch_with_llm(batch: list[dict]) -> list[dict]:
