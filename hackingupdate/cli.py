@@ -49,14 +49,34 @@ def cli():
     default=None,
     help="Max article age in days (overrides ARTICLE_MAX_AGE_DAYS env var).",
 )
-def run(step, no_cache_clear, age_days):
+@click.option(
+    "--cross-day-days",
+    type=int,
+    default=None,
+    help="Days of historical findings to deduplicate against (default: 7).",
+)
+@click.option(
+    "--no-cross-day-dedupe",
+    is_flag=True,
+    default=False,
+    help="Disable cross-day SQLite deduplication.",
+)
+def run(step, no_cache_clear, age_days, cross_day_days, no_cross_day_dedupe):
     """Run the daily security briefing pipeline."""
     import os
+    import hackingupdate.config as cfg
+
     if age_days is not None:
         os.environ["ARTICLE_MAX_AGE_DAYS"] = str(age_days)
-        # Update imported config variable if needed
-        import hackingupdate.config as cfg
         cfg.ARTICLE_MAX_AGE_DAYS = age_days
+
+    if cross_day_days is not None:
+        os.environ["CROSS_DAY_DEDUPE_DAYS"] = str(cross_day_days)
+        cfg.CROSS_DAY_DEDUPE_DAYS = cross_day_days
+
+    if no_cross_day_dedupe:
+        os.environ["ENABLE_CROSS_DAY_DEDUPE"] = "false"
+        cfg.ENABLE_CROSS_DAY_DEDUPE = False
 
     if step:
         click.echo(f"🔒 Running single step: {step}")
@@ -104,13 +124,18 @@ def notify(whatsapp, teams, email, all_channels, channel):
     if email or all_channels:
         steps.append("email")
 
+    failed = False
     for step_name in steps:
         click.echo(f"📤 Sending {step_name} notification...")
         success = run_step(step_name)
         if not success:
+            failed = True
             click.echo(f"  ❌ {step_name} notification failed.")
         else:
             click.echo(f"  ✅ {step_name} notification sent!")
+
+    if failed:
+        raise SystemExit(1)
 
 
 # ─── feeds ────────────────────────────────────────────────────────────────────
@@ -312,6 +337,9 @@ def init():
     click.echo("  Pipeline Settings:")
     click.echo(f"    Max Article Age: {ARTICLE_MAX_AGE_DAYS} day(s)")
     click.echo(f"    LLM Batch Delay: {LLM_BATCH_DELAY}s")
+    from hackingupdate.config import CROSS_DAY_DEDUPE_DAYS, ENABLE_CROSS_DAY_DEDUPE, CISA_KEV_CACHE_FILE
+    click.echo(f"    Cross-Day Dedupe: {'✅ ' + str(CROSS_DAY_DEDUPE_DAYS) + ' days' if ENABLE_CROSS_DAY_DEDUPE else '❌ Disabled'}")
+    click.echo(f"    CISA KEV Cache:   {'✅ ' + str(CISA_KEV_CACHE_FILE) if CISA_KEV_CACHE_FILE.exists() else '⏳ Not cached yet'}")
     click.echo()
     click.echo("  API & Channel Config:")
     click.echo(f"    LLM Model:       {OPENROUTER_MODEL}")
@@ -335,7 +363,7 @@ def steps():
     click.echo("📋 Pipeline Steps:\n")
     for i, (name, _, description) in enumerate(PIPELINE_STEPS, 1):
         click.echo(f"  {i:2d}. {name:<15s}  {description}")
-    click.echo(f"\nRun a single step: hackingupdate run --step <name>")
+    click.echo("\nRun a single step: hackingupdate run --step <name>")
 
 
 # ─── db ───────────────────────────────────────────────────────────────────────
@@ -349,19 +377,18 @@ def db():
 @db.command("stats")
 def db_stats():
     """Show database summary statistics."""
-    import sys as _sys
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent / "scripts"))
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent))
-
     try:
-        from scripts import db_manager
+        from hackingupdate import db_manager
         db_manager.init_db()
         stats = db_manager.get_stats()
-        click.echo(f"📊 Database Statistics:\n")
+        click.echo("📊 Database Statistics:\n")
         click.echo(f"  Database:        {stats['db_path']}")
         click.echo(f"  Total Findings:  {stats['total_findings']}")
         click.echo(f"  Unique Days:     {stats['unique_dates']}")
         click.echo(f"  Pipeline Runs:   {stats['total_runs']}")
+        click.echo(f"  CISA KEV Alerts: {stats.get('total_cisa_kev', 0)}")
+        click.echo(f"  Ransomware Hits: {stats.get('total_ransomware', 0)}")
+        click.echo(f"  Max EPSS Score:  {stats.get('max_epss', 0.0):.1%}")
         click.echo(f"  Latest Date:     {stats['latest_date']} ({stats['latest_count']} findings)")
     except Exception as e:
         click.echo(f"❌ Could not read database: {e}")
@@ -370,12 +397,8 @@ def db_stats():
 @db.command("today")
 def db_today():
     """Show today's findings from the database."""
-    import sys as _sys
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent / "scripts"))
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent))
-
     try:
-        from scripts import db_manager
+        from hackingupdate import db_manager
         db_manager.init_db()
         findings = db_manager.get_findings_by_date()
 
@@ -387,8 +410,16 @@ def db_today():
         for f in findings:
             severity = f.get("severity", "?")
             rank = f.get("rank", 0)
-            title = f.get("title", "")[:70]
-            click.echo(f"  [{severity:8s}] Rank {rank:2d} | {title}")
+            is_kev = bool(f.get("is_cisa_kev", 0))
+            epss = float(f.get("epss_score") or 0.0)
+            badges = []
+            if is_kev:
+                badges.append("🚨 CISA KEV")
+            if epss >= 0.2:
+                badges.append(f"EPSS: {epss:.0%}")
+            badge_str = f" [{' | '.join(badges)}]" if badges else ""
+            title = f.get("title", "")[:65]
+            click.echo(f"  [{severity:8s}] Rank {rank:2d} | {title}{badge_str}")
     except Exception as e:
         click.echo(f"❌ Could not read database: {e}")
 
@@ -397,12 +428,8 @@ def db_today():
 @click.option("--limit", "-n", default=10, help="Number of runs to show.")
 def db_history(limit):
     """Show pipeline run history."""
-    import sys as _sys
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent / "scripts"))
-    _sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent.parent))
-
     try:
-        from scripts import db_manager
+        from hackingupdate import db_manager
         db_manager.init_db()
         runs = db_manager.get_run_history(limit)
 
@@ -419,6 +446,220 @@ def db_history(limit):
                        f"({r['pipeline_duration_sec']:.1f}s)")
     except Exception as e:
         click.echo(f"❌ Could not read database: {e}")
+
+
+# ─── doctor ───────────────────────────────────────────────────────────────────
+
+@cli.command()
+def doctor():
+    """Check system health: API keys, feeds, DB, disk space, and config."""
+    import shutil
+    import sqlite3
+    import time
+    import requests
+    import feedparser
+
+    import hackingupdate.config as cfg
+
+    ok_count = 0
+    warn_count = 0
+    err_count = 0
+
+    def _ok(msg: str):
+        nonlocal ok_count
+        ok_count += 1
+        click.echo(f"  ✅ {msg}")
+
+    def _warn(msg: str):
+        nonlocal warn_count
+        warn_count += 1
+        click.echo(f"  ⚠️  {msg}")
+
+    def _err(msg: str):
+        nonlocal err_count
+        err_count += 1
+        click.echo(f"  ❌ {msg}")
+
+    click.echo(f"\n🩺 HackingUpdate v{__version__} — Health Check\n")
+
+    # ── 1. OpenRouter API Key ──────────────────────────────────────────────────
+    click.echo("── LLM / AI ──────────────────────────────────────────────────")
+    if not cfg.OPENROUTER_API_KEY:
+        _err("OpenRouter API key not set (OPENROUTER_API_KEY missing in .env)")
+    else:
+        try:
+            resp = requests.get(
+                "https://openrouter.ai/api/v1/auth/key",
+                headers={"Authorization": f"Bearer {cfg.OPENROUTER_API_KEY}"},
+                timeout=8,
+            )
+            if resp.status_code == 200:
+                data = resp.json().get("data", {})
+                usage = data.get("usage", 0)
+                limit = data.get("limit")
+                limit_str = f"{limit:.0f}" if limit else "unlimited"
+                _ok(f"OpenRouter API key valid  (model: {cfg.OPENROUTER_MODEL}, usage: ${usage:.4f} / ${limit_str})")
+            elif resp.status_code == 401:
+                _err(f"OpenRouter API key EXPIRED or INVALID — renew at https://openrouter.ai/keys")
+            else:
+                _warn(f"OpenRouter API key check returned HTTP {resp.status_code}")
+        except Exception as e:
+            _warn(f"Could not reach OpenRouter to validate key: {e}")
+
+    # ── 2. CISA KEV Cache ──────────────────────────────────────────────────────
+    click.echo("\n── Threat Intelligence ───────────────────────────────────────")
+    kev_cache = cfg.CISA_KEV_CACHE_FILE
+    if kev_cache.exists():
+        age_sec = time.time() - kev_cache.stat().st_mtime
+        age_h = age_sec / 3600
+        try:
+            import json as _json
+            with open(kev_cache) as f:
+                kev = _json.load(f)
+            entry_count = len(kev)
+            if age_h < cfg.CISA_KEV_CACHE_TTL_HOURS:
+                _ok(f"CISA KEV cache fresh  ({entry_count:,} entries, updated {age_h:.1f}h ago)")
+            else:
+                _warn(f"CISA KEV cache stale  ({entry_count:,} entries, updated {age_h:.1f}h ago — TTL: {cfg.CISA_KEV_CACHE_TTL_HOURS}h)")
+        except Exception:
+            _warn("CISA KEV cache file exists but could not be read")
+    else:
+        _warn("CISA KEV cache not downloaded yet — run 'hackingupdate run --step rank' to populate")
+
+    # EPSS API
+    try:
+        resp = requests.get(
+            cfg.EPSS_API_URL,
+            params={"cve": "CVE-2021-44228"},  # log4shell — always present
+            timeout=8,
+        )
+        if resp.status_code == 200:
+            _ok("EPSS API reachable  (api.first.org)")
+        else:
+            _warn(f"EPSS API returned HTTP {resp.status_code}")
+    except Exception as e:
+        _warn(f"EPSS API unreachable: {e}")
+
+    # ── 3. Feed health ─────────────────────────────────────────────────────────
+    click.echo("\n── Feeds ─────────────────────────────────────────────────────")
+    if not cfg.FEEDS_FILE.exists():
+        _err(f"Feeds file not found: {cfg.FEEDS_FILE}")
+    else:
+        with open(cfg.FEEDS_FILE) as f:
+            feed_urls = [l.strip() for l in f if l.strip() and not l.strip().startswith("#")]
+
+        dead_feeds = []
+        slow_feeds = []
+
+        for url in feed_urls:
+            try:
+                t0 = time.time()
+                r = requests.get(
+                    url,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=10,
+                )
+                elapsed = time.time() - t0
+                if r.status_code == 200:
+                    parsed = feedparser.parse(r.content)
+                    entry_count = len(parsed.entries)
+                    if entry_count == 0:
+                        dead_feeds.append((url, "no entries returned"))
+                    elif elapsed > 5:
+                        slow_feeds.append((url, f"{elapsed:.1f}s"))
+                else:
+                    dead_feeds.append((url, f"HTTP {r.status_code}"))
+            except requests.exceptions.SSLError as e:
+                dead_feeds.append((url, f"SSL error: {str(e)[:60]}"))
+            except Exception as e:
+                dead_feeds.append((url, str(e)[:60]))
+
+        healthy = len(feed_urls) - len(dead_feeds)
+        if not dead_feeds:
+            _ok(f"All {len(feed_urls)} feeds healthy")
+        else:
+            _warn(f"{healthy}/{len(feed_urls)} feeds healthy — {len(dead_feeds)} failing:")
+            for url, reason in dead_feeds:
+                click.echo(f"       🔴 {url}")
+                click.echo(f"          Reason: {reason}")
+        if slow_feeds:
+            _warn(f"{len(slow_feeds)} feeds responding slowly:")
+            for url, t in slow_feeds:
+                click.echo(f"       🟡 {url}  ({t})")
+
+    # ── 4. SQLite Database ─────────────────────────────────────────────────────
+    click.echo("\n── Database ──────────────────────────────────────────────────")
+    db_path = cfg.DB_PATH
+    if not db_path.exists():
+        _warn("SQLite database not created yet — run the pipeline to initialise it")
+    else:
+        try:
+            conn = sqlite3.connect(str(db_path))
+            total = conn.execute("SELECT COUNT(*) FROM findings").fetchone()[0]
+            days = conn.execute("SELECT COUNT(DISTINCT briefing_date) FROM findings").fetchone()[0]
+            conn.execute("PRAGMA integrity_check").fetchone()
+            conn.close()
+            size_kb = db_path.stat().st_size / 1024
+            _ok(f"SQLite DB healthy  ({total} findings across {days} days, {size_kb:.1f} KB)")
+        except Exception as e:
+            _err(f"SQLite DB error: {e}")
+
+    # ── 5. Disk space ──────────────────────────────────────────────────────────
+    click.echo("\n── Storage ───────────────────────────────────────────────────")
+    total_b, used_b, free_b = shutil.disk_usage(cfg.BASE_DIR)
+    free_gb = free_b / 1024**3
+    if free_gb < 0.5:
+        _err(f"Low disk space: {free_gb:.2f} GB free — cache/reports may fail")
+    elif free_gb < 2.0:
+        _warn(f"Disk space: {free_gb:.1f} GB free (below 2 GB recommended)")
+    else:
+        _ok(f"Disk space: {free_gb:.1f} GB free")
+
+    # Reports and cache dir sizes
+    for label, path in [("reports/", cfg.REPORTS_DIR), ("cache/", cfg.CACHE_DIR), ("logs/", cfg.LOGS_DIR)]:
+        if path.exists():
+            size = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+            click.echo(f"     {label:<12} {size/1024:.1f} KB")
+
+    # ── 6. Notification channels ───────────────────────────────────────────────
+    click.echo("\n── Notification Channels ─────────────────────────────────────")
+    channels_configured = 0
+
+    if cfg.TEAMS_WEBHOOK_URL:
+        channels_configured += 1
+        try:
+            r = requests.head(cfg.TEAMS_WEBHOOK_URL, timeout=6)
+            _ok(f"Teams webhook reachable  (HTTP {r.status_code})")
+        except Exception as e:
+            _warn(f"Teams webhook not reachable: {e}")
+    else:
+        click.echo("     Teams webhook:     ⬜ Not configured (TEAMS_WEBHOOK_URL)")
+
+    if cfg.TWILIO_ACCOUNT_SID and cfg.TWILIO_AUTH_TOKEN:
+        channels_configured += 1
+        _ok(f"Twilio WhatsApp configured  → {cfg.TWILIO_TO_NUMBER}")
+    else:
+        click.echo("     Twilio WhatsApp:   ⬜ Not configured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN)")
+
+    if cfg.SMTP_HOST and cfg.SMTP_USERNAME:
+        channels_configured += 1
+        _ok(f"Email (SMTP) configured  ({cfg.SMTP_HOST}:{cfg.SMTP_PORT} → {cfg.SMTP_TO_EMAILS})")
+    else:
+        click.echo("     Email/SMTP:        ⬜ Not configured (SMTP_HOST / SMTP_USERNAME)")
+
+    if channels_configured == 0:
+        _warn("No notification channels configured — reports will only be saved to disk")
+
+    # ── Summary ────────────────────────────────────────────────────────────────
+    total_checks = ok_count + warn_count + err_count
+    click.echo(f"\n{'─'*58}")
+    if err_count == 0 and warn_count == 0:
+        click.echo(f"✅ All {total_checks} checks passed — system is healthy")
+    elif err_count == 0:
+        click.echo(f"⚠️  {ok_count} ok · {warn_count} warning(s) · {err_count} error(s)  — check warnings above")
+    else:
+        click.echo(f"❌ {ok_count} ok · {warn_count} warning(s) · {err_count} error(s)  — fix errors before running pipeline")
+    click.echo()
 
 
 if __name__ == "__main__":

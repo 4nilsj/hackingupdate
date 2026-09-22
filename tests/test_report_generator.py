@@ -25,6 +25,16 @@ def test_generate_local_fallback_report():
             "tags": ["web"],
             "rank_reason": "High severity RCE",
             "content_text": "Details about remote code execution flaw in web application."
+        },
+        {
+            "id": "2",
+            "title": "Startup funding round announced",
+            "source": "SecurityWeek",
+            "link": "https://example.com/funding",
+            "rank": 3,
+            "tags": ["news"],
+            "rank_reason": "Company funding announcement",
+            "content_text": "A startup announced its funding round with no vulnerability details."
         }
     ]
 
@@ -34,3 +44,6 @@ def test_generate_local_fallback_report():
     assert "Priority Rank" in report_md
     assert "9/10" in report_md
     assert "STRIDE Threat" in report_md
+    assert "Priority Queue" in report_md
+    assert "Configure OPENROUTER_API_KEY" not in report_md
+    assert "Startup funding round announced" not in report_md

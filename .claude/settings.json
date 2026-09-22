@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(semgrep scan *)",
+      "mcp__Claude_Browser__read_page",
+      "mcp__Claude_Browser__read_network_requests",
+      "mcp__Claude_Browser__find"
+    ]
+  }
+}

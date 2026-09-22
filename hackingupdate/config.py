@@ -70,6 +70,18 @@ SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", 
 # ---------------------------------------------------------------------------
 ARTICLE_MAX_AGE_DAYS: int = int(os.getenv("ARTICLE_MAX_AGE_DAYS", "1"))
 LLM_BATCH_DELAY: float = float(os.getenv("LLM_BATCH_DELAY", "2"))
+CROSS_DAY_DEDUPE_DAYS: int = int(os.getenv("CROSS_DAY_DEDUPE_DAYS", "7"))
+ENABLE_CROSS_DAY_DEDUPE: bool = os.getenv("ENABLE_CROSS_DAY_DEDUPE", "true").lower() in ("true", "1", "yes")
+
+# ---------------------------------------------------------------------------
+# Threat Intelligence Enrichment (CISA KEV & EPSS)
+# ---------------------------------------------------------------------------
+CISA_KEV_CACHE_TTL_HOURS: int = int(os.getenv("CISA_KEV_CACHE_TTL_HOURS", "24"))
+CISA_KEV_URL: str = os.getenv(
+    "CISA_KEV_URL",
+    "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+)
+EPSS_API_URL: str = os.getenv("EPSS_API_URL", "https://api.first.org/data/v1/epss")
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -106,6 +118,8 @@ FINGERPRINT_CACHE_FILE: Path = CACHE_DIR / "articles_fingerprints.json"
 DEDUPED_CACHE_FILE: Path = CACHE_DIR / "articles_deduped.json"
 RANKED_CACHE_FILE: Path = CACHE_DIR / "articles_ranked.json"
 WORKING_CACHE_FILE: Path = CACHE_DIR / "articles_working.json"
+CISA_KEV_CACHE_FILE: Path = DATA_DIR / "cisa_kev.json"
+EPSS_CACHE_FILE: Path = CACHE_DIR / "epss_cache.json"
 
 # ---------------------------------------------------------------------------
 # Feed Config
