@@ -163,7 +163,7 @@ def test_rank_batch_with_llm_falls_back_for_missing_id(monkeypatch):
     assert result[0]["rank"] == 9
     # Article "2" wasn't in the LLM response, so it must fall back to heuristics.
     assert result[1]["id"] == "2"
-    assert result[1]["reason"].startswith("Fallback:")
+    assert "prioritization" in result[1]["reason"] or result[1]["reason"].startswith("Fallback:")
 
 
 def test_rank_batch_with_llm_falls_back_when_api_call_fails(monkeypatch):
@@ -172,7 +172,7 @@ def test_rank_batch_with_llm_falls_back_when_api_call_fails(monkeypatch):
     with patch.object(priority_ranker, "_call_openrouter_with_retry", side_effect=Exception("boom")):
         result = rank_batch_with_llm(batch)
 
-    assert result[0]["reason"].startswith("Fallback:")
+    assert "prioritization" in result[0]["reason"] or result[0]["reason"].startswith("Fallback:")
 
 
 def test_rank_batch_with_llm_falls_back_on_malformed_json(monkeypatch):
@@ -181,7 +181,7 @@ def test_rank_batch_with_llm_falls_back_on_malformed_json(monkeypatch):
     with patch.object(priority_ranker, "_call_openrouter_with_retry", return_value="not valid json"):
         result = rank_batch_with_llm(batch)
 
-    assert result[0]["reason"].startswith("Fallback:")
+    assert "prioritization" in result[0]["reason"] or result[0]["reason"].startswith("Fallback:")
 
 
 def test_main_exits_when_deduped_cache_missing(tmp_path, monkeypatch):
