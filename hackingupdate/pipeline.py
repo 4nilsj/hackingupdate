@@ -36,18 +36,8 @@ PIPELINE_STEPS = [
 
 
 def _import_step_module(module_name: str):
-    """Dynamically import a script module from the scripts/ directory."""
-    # Ensure scripts dir is on sys.path
-    scripts_dir = str(Path(__file__).resolve().parent.parent / "scripts")
-    if scripts_dir not in sys.path:
-        sys.path.insert(0, scripts_dir)
-
-    # Also ensure project root is on sys.path for config imports
-    project_root = str(Path(__file__).resolve().parent.parent)
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-
-    return importlib.import_module(module_name)
+    """Import a pipeline step module directly from the hackingupdate package."""
+    return importlib.import_module(f"hackingupdate.{module_name}")
 
 
 def clear_cache():
@@ -182,11 +172,7 @@ def run_pipeline(steps: list[str] | None = None, skip_cache_clear: bool = False)
 def _log_run_metrics(pipeline_duration_sec: float) -> None:
     """Persist pipeline run metrics to the SQLite database."""
     try:
-        scripts_dir = str(Path(__file__).resolve().parent.parent / "scripts")
-        if scripts_dir not in sys.path:
-            sys.path.insert(0, scripts_dir)
-
-        from scripts import db_manager
+        from hackingupdate import db_manager
         db_manager.init_db()
 
         # Read article counts from cache files

@@ -5,11 +5,12 @@ An AI-powered pipeline that aggregates security feeds, deduplicates findings, ra
 ## Features
 
 - **Multi-Feed Aggregation** — RSS/Atom feeds from CISA, PacketStorm, SecurityWeek, BleepingComputer, and more (concurrent fetching)
-- **AI-Powered Ranking** — LLM-based threat scoring with pentest-relevant tagging & automatic retry with exponential backoff
-- **Smart Deduplication** — Fingerprint-based detection eliminates duplicate CVE coverage across feeds
+- **CISA KEV & EPSS Threat Enrichment** — Real-time lookup against CISA's Known Exploited Vulnerabilities catalog & FIRST.org EPSS scores to identify actively exploited zero-days and ransomware threats
+- **AI-Powered Ranking** — LLM-based threat scoring with pentest-relevant tagging & automatic retry with exponential backoff (hard-floor ranking for KEV & ransomware advisories)
+- **Cross-Day & Multi-Feed Deduplication** — SQLite historical lookups + Jaccard similarity eliminate both same-day duplicates and recurring stories across 7 days
 - **Date Freshness Filter** — Configurable article age filter (default: 1 day, adjustable via CLI/env)
-- **SQLite Persistence** — Stores findings date-wise with built-in duplicate prevention & pipeline metrics tracking
-- **Beautiful HTML Reports** — Dark-mode, glassmorphism UI with search, filtering, and mobile-responsive design
+- **SQLite Persistence** — Stores findings date-wise with built-in duplicate prevention, CVE tracking, and pipeline metrics
+- **Beautiful HTML Reports** — Dark-mode, glassmorphism UI with search, filtering, KEV/EPSS badges, and mobile-responsive design
 - **RSS 2.0 Output Feed** — Generates `reports/rss.xml` and `reports/feed.xml` for syndication
 - **Multi-Channel Notifications** — Microsoft Teams webhooks + Twilio WhatsApp + SMTP Email notifications
 - **OPML Import/Export** — Seamlessly import & export feed subscriptions via OPML standard
@@ -172,36 +173,44 @@ ORDER BY rank DESC;
 
 ```
 hackingupdate/
-├── hackingupdate/          # Python package (productized)
+├── hackingupdate/              # Core Python package (productized)
 │   ├── __init__.py
-│   ├── cli.py              # Click-based CLI entry point
-│   ├── config.py           # Configuration management
-│   └── pipeline.py         # Orchestration engine
-├── scripts/                # Pipeline step modules
-│   ├── fetcher.py          # RSS/Atom feed fetcher
-│   ├── extractor.py        # HTML cleaner + date filter
-│   ├── fingerprint_analyzer.py  # Content fingerprinting
-│   ├── dedupe_fingerprints.py   # Deduplication engine
-│   ├── priority_ranker.py  # AI-powered threat ranker
-│   ├── build_working_set.py# Working set builder
-│   ├── db_manager.py       # SQLite persistence layer
-│   ├── report_generator.py # Markdown report generator
-│   ├── html_generator.py   # HTML report renderer
-│   ├── teams_notifier.py   # MS Teams webhook sender
-│   ├── whatsapp_notifier.py# Twilio WhatsApp sender
-│   └── prune_logs.py       # Log rotation
-├── feeds/                  # Feed URL configuration
+│   ├── cli.py                  # Click-based CLI entry point
+│   ├── config.py               # Central configuration & path management
+│   ├── pipeline.py             # Modular orchestration engine
+│   ├── cve_enrichment.py       # CISA KEV catalog & FIRST.org EPSS lookup
+│   ├── db_manager.py           # SQLite persistence layer & history queries
+│   ├── dedupe_fingerprints.py  # Cross-day & intraday deduplication engine
+│   ├── fetcher.py              # Concurrent RSS/Atom feed fetcher
+│   ├── extractor.py            # HTML cleaner & date freshness filter
+│   ├── fingerprint_analyzer.py # Content keyword & simhash fingerprinting
+│   ├── priority_ranker.py      # LLM threat scoring & KEV/ransomware floors
+│   ├── build_working_set.py    # Diversified high-priority briefing selector
+│   ├── report_generator.py     # Markdown briefing report generator
+│   ├── html_generator.py       # Glassmorphism HTML briefing renderer
+│   ├── report_formatting.py    # Card & threat modeling formatters
+│   ├── report_template.py      # Responsive HTML template & UI styling
+│   ├── rss_generator.py        # RSS 2.0 XML feed generator
+│   ├── teams_notifier.py       # MS Teams webhook notifier
+│   ├── whatsapp_notifier.py    # Twilio / WhatsApp gateway notifier
+│   ├── email_notifier.py       # SMTP HTML email notifier
+│   └── prune_logs.py           # Log rotation & pruning
+├── scripts/                    # Backward-compatibility execution shims
+│   └── *.py                    # Transparent aliasing to hackingupdate.*
+├── tests/                      # Full pytest test suite (150 tests, 70%+ coverage)
+├── feeds/                      # Feed URL configuration
 │   └── feeds.txt
-├── data/                   # SQLite database (auto-created)
-│   └── hackingupdate.db
-├── cache/                  # Runtime JSON cache (cleared each run)
-├── reports/                # Generated HTML & Markdown reports
-├── logs/                   # Pipeline execution logs
+├── data/                       # SQLite database & KEV cache (auto-created)
+│   ├── hackingupdate.db
+│   └── cisa_kev.json
+├── cache/                      # Runtime JSON cache
+├── reports/                    # Generated HTML & Markdown reports
+├── logs/                       # Pipeline execution logs
 ├── Dockerfile
 ├── docker-compose.yml
 ├── pyproject.toml
 ├── Makefile
-├── run_brief.sh            # Legacy shell orchestrator
+├── run_brief.sh                # Legacy shell orchestrator (100% compatible)
 ├── .env.example
 └── README.md
 ```

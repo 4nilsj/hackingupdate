@@ -1,12 +1,12 @@
 # Curated daily security RSS/Atom feeds for vulnerability and exploit updates
 https://www.cisa.gov/cybersecurity-advisories/all.xml
-https://rss.packetstormsecurity.com/files/
-https://rss.packetstormsecurity.com/news/
+https://isc.sans.edu/rssfeed_full.xml
+https://research.checkpoint.com/feed/
 https://googleprojectzero.blogspot.com/feeds/posts/default
-https://apisecurity.io/feed/
+https://www.malwarebytes.com/blog/feed/index.xml
 https://www.securityweek.com/feed/
 https://www.bleepingcomputer.com/feed/
-https://www.hkcert.org/rss/security-bulletin.xml
+https://www.welivesecurity.com/en/rss/feed/
 https://thehackernews.com/rss.xml
 https://www.darkreading.com/rss.xml
 https://krebsonsecurity.com/feed/
