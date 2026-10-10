@@ -1,7 +1,7 @@
 import sys
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 from urllib.parse import urlsplit
 
@@ -10,6 +10,29 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 import hackingupdate.config as config
 
 logger = config.get_logger("report_generator")
+
+CRITICAL_RANK = 8
+HIGH_RANK = 6
+RELEVANT_RANK = 4
+THREAT_MODEL_RANK = 7
+EPSS_REPORT_THRESHOLD = 0.15
+
+
+def _rank(article) -> int:
+    """Return an article's priority rank as an int, defaulting to 0."""
+    try:
+        return int(article.get("rank", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _severity(score) -> str:
+    """Map a numeric rank to a severity label."""
+    if score >= CRITICAL_RANK:
+        return "Critical"
+    if score >= HIGH_RANK:
+        return "High"
+    return "Medium"
 
 REPORT_SYSTEM_PROMPT = """
 You are a cybersecurity analyst producing a security intelligence briefing.
@@ -38,7 +61,8 @@ def _normalize_reason_text(reason):
     cleaned = re.sub(r"^Tagged via keyword heuristics.*?", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s*\[(?:CISA KEV|EPSS|.*?signal.*?)\]\s*$", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    if not cleaned:
+    # If stripping boilerplate left only punctuation (e.g. a lone "."), treat as empty.
+    if not re.search(r"[A-Za-z0-9]", cleaned):
         return "Priority based on exploitability, exposure, and threat intelligence signals."
     if not cleaned.endswith("."):
         cleaned += "."
@@ -207,7 +231,7 @@ def format_readable_description(text):
 
     # Extract CVEs
     cves = re.findall(r'CVE-\d{4}-\d{4,7}', cleaned)
-    cves = sorted(list(set(cves)))
+    cves = sorted(set(cves))
 
     # Split into sentences
     sentences = re.split(r'(?<=[.!?])\s+', cleaned)
@@ -235,26 +259,67 @@ def format_readable_description(text):
             d = d.strip("- ").strip()
             bullets.append(f"**Detail {idx+1}**: {d}")
     else:
-        bullets.append(f"**Details**: {cleaned[:350]}...")
+        snippet = cleaned[:350]
+        ellipsis = "..." if len(cleaned) > 350 else ""
+        bullets.append(f"**Details**: {snippet}{ellipsis}")
 
     return "\n".join([f"- {b}" for b in bullets])
+
+def _render_article_card(art, tags_str, include_exploitation=True):
+    """Render a single article as Markdown lines for the fallback report."""
+    title = art.get("title", "Untitled")
+    source = art.get("source", "Unknown source")
+    link = art.get("link", "")
+    score = _rank(art)
+
+    lines = [
+        f"### {title}",
+        f"- **Source**: {source}",
+        f"- **Priority Rank**: `{score}/10`",
+        f"- **Link**: [{link}]({link})",
+        f"- **Pentester Category Tags**: {tags_str}",
+    ]
+
+    if include_exploitation:
+        if art.get("is_cisa_kev"):
+            rw_str = " (🚨 Known Ransomware Campaign Use)" if art.get("cisa_ransomware") else ""
+            lines.append(f"- **CISA KEV Status**: 🚨 **Actively Exploited in the Wild**{rw_str}")
+        epss = float(art.get("epss_score") or 0.0)
+        if epss >= EPSS_REPORT_THRESHOLD:
+            lines.append(f"- **EPSS Exploit Prediction**: `{epss:.1%}` probability of exploitation")
+
+    lines.append(f"- **Reasoning**: {_normalize_reason_text(art.get('rank_reason', 'N/A'))}\n")
+
+    if include_exploitation and score >= THREAT_MODEL_RANK:
+        threat = _infer_threat_model(art)
+        lines.append("**Threat Modeling & Secure Design Lesson**:\n")
+        lines.append(f"- *STRIDE Threat*: {threat['stride']}\n")
+        lines.append(f"- *Design Flaw*: {threat['design_flaw']}\n")
+        lines.append(f"- *Secure Design Principle*: {threat['principle']}\n")
+        lines.append(f"- *Secure Design Review Question*: {threat['review_question']}\n")
+
+    readable_desc = format_readable_description(art.get("content_text") or "")
+    lines.append(f"**Description & Context**:\n\n{readable_desc}\n")
+    lines.append("---\n")
+    return lines
+
 
 def generate_local_fallback_report(working_set, today_str):
     # Basic Markdown generator if LLM is unavailable.
     # Keep it concise, ranked, and action-oriented rather than filled with
     # placeholder text and generic noise.
-    relevant_items = [art for art in working_set if int(art.get("rank", 0) or 0) >= 4]
+    relevant_items = [art for art in working_set if _rank(art) >= RELEVANT_RANK]
     if not relevant_items:
         relevant_items = working_set[:5]
 
-    sorted_items = sorted(relevant_items, key=lambda art: int(art.get("rank", 0) or 0), reverse=True)
+    sorted_items = sorted(relevant_items, key=_rank, reverse=True)
 
     md = []
     md.append(f"# Daily Security Intelligence Briefing - {today_str}\n")
     md.append("## Executive Summary\n")
     summary_count = len(sorted_items)
-    critical_count = sum(1 for art in sorted_items if int(art.get("rank", 0) or 0) >= 8)
-    high_count = sum(1 for art in sorted_items if 6 <= int(art.get("rank", 0) or 0) < 8)
+    critical_count = sum(1 for art in sorted_items if _rank(art) >= CRITICAL_RANK)
+    high_count = sum(1 for art in sorted_items if HIGH_RANK <= _rank(art) < CRITICAL_RANK)
     md.append(
         f"The current briefing highlights **{summary_count}** relevant findings, including **{critical_count}** critical and **{high_count}** high-priority items. The focus is on actionable vulnerabilities, exploited issues, and high-risk changes that warrant triage or patch validation.\n"
     )
@@ -263,9 +328,10 @@ def generate_local_fallback_report(working_set, today_str):
     if top_items:
         md.append("## Priority Queue\n")
         for index, art in enumerate(top_items, start=1):
-            score = int(art.get("rank", 0) or 0)
-            severity = "Critical" if score >= 8 else "High" if score >= 6 else "Medium"
-            md.append(f"{index}. **{art['title']}** — {severity} ({score}/10) — {art.get('source', 'Unknown source')}\n")
+            score = _rank(art)
+            md.append(
+                f"{index}. **{art.get('title', 'Untitled')}** — {_severity(score)} ({score}/10) — {art.get('source', 'Unknown source')}\n"
+            )
         md.append("")
 
     seen_ids = set()
@@ -273,7 +339,7 @@ def generate_local_fallback_report(working_set, today_str):
     uncategorized = []
 
     for art in sorted_items:
-        art_id = art.get("id", art["title"])
+        art_id = art.get("id") or art.get("title")
         if art_id in seen_ids:
             continue
         seen_ids.add(art_id)
@@ -288,51 +354,19 @@ def generate_local_fallback_report(working_set, today_str):
             uncategorized.append(art)
 
     for tag in config.PENTEST_TAGS:
-        items = sorted(categorized[tag], key=lambda art: int(art.get("rank", 0) or 0), reverse=True)
+        items = sorted(categorized[tag], key=_rank, reverse=True)
         if not items:
             continue
         md.append(f"## Category: {tag.upper()}\n")
         for art in items:
             tags_str = ", ".join(art.get("tags", [tag]))
-            md.append(f"### {art['title']}")
-            md.append(f"- **Source**: {art['source']}")
-            md.append(f"- **Priority Rank**: `{art.get('rank', 5)}/10`")
-            md.append(f"- **Link**: [{art['link']}]({art['link']})")
-            md.append(f"- **Pentester Category Tags**: {tags_str}")
-            if art.get("is_cisa_kev"):
-                rw_str = " (🚨 Known Ransomware Campaign Use)" if art.get("cisa_ransomware") else ""
-                md.append(f"- **CISA KEV Status**: 🚨 **Actively Exploited in the Wild**{rw_str}")
-            epss = float(art.get("epss_score") or 0.0)
-            if epss >= 0.15:
-                md.append(f"- **EPSS Exploit Prediction**: `{epss:.1%}` probability of exploitation")
-            md.append(f"- **Reasoning**: {_normalize_reason_text(art.get('rank_reason', 'N/A'))}\n")
-
-            if art.get('rank', 5) >= 7:
-                threat = _infer_threat_model(art)
-                md.append("**Threat Modeling & Secure Design Lesson**:\n")
-                md.append(f"- *STRIDE Threat*: {threat['stride']}\n")
-                md.append(f"- *Design Flaw*: {threat['design_flaw']}\n")
-                md.append(f"- *Secure Design Principle*: {threat['principle']}\n")
-                md.append(f"- *Secure Design Review Question*: {threat['review_question']}\n")
-
-            readable_desc = format_readable_description(art.get('content_text', ''))
-            md.append(f"**Description & Context**:\n\n{readable_desc}\n")
-            md.append("---\n")
+            md.extend(_render_article_card(art, tags_str))
 
     if uncategorized:
         md.append("## General Security Updates\n")
-        for art in sorted(uncategorized, key=lambda a: int(a.get("rank", 0) or 0), reverse=True):
+        for art in sorted(uncategorized, key=_rank, reverse=True):
             tags_str = ", ".join(art.get("tags", ["news"]))
-            md.append(f"### {art['title']}")
-            md.append(f"- **Source**: {art['source']}")
-            md.append(f"- **Priority Rank**: `{art.get('rank', 5)}/10`")
-            md.append(f"- **Link**: [{art['link']}]({art['link']})")
-            md.append(f"- **Pentester Category Tags**: {tags_str}")
-            md.append(f"- **Reasoning**: {_normalize_reason_text(art.get('rank_reason', 'N/A'))}\n")
-
-            readable_desc = format_readable_description(art.get('content_text', ''))
-            md.append(f"**Description & Context**:\n\n{readable_desc}\n")
-            md.append("---\n")
+            md.extend(_render_article_card(art, tags_str, include_exploitation=False))
 
     return "\n".join(md)
 
@@ -352,13 +386,13 @@ def generate_llm_report(working_set, today_str):
     serialized_articles = []
     for art in working_set:
         serialized_articles.append({
-            "title": art["title"],
-            "link": art["link"],
-            "source": art["source"],
-            "rank": art["rank"],
-            "tags": art["tags"],
-            "rank_reason": art["rank_reason"],
-            "content": art["content_text"][:1200]  # first 1200 chars is sufficient for summary
+            "title": art.get("title", ""),
+            "link": art.get("link", ""),
+            "source": art.get("source", ""),
+            "rank": _rank(art),
+            "tags": art.get("tags", []),
+            "rank_reason": art.get("rank_reason", ""),
+            "content": (art.get("content_text") or "")[:1200]  # first 1200 chars is sufficient for summary
         })
 
     prompt = f"""
@@ -483,7 +517,7 @@ def main():
         logger.critical(f"Failed to load working set cache: {e}")
         sys.exit(1)
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     report_file = config.REPORTS_DIR / f"daily_brief_{today_str}.md"
 
     logger.info(f"Generating Daily Brief for {today_str}...")
